@@ -1,107 +1,43 @@
-import { useEffect, useRef, useCallback } from 'react'
-import './index.css'
+import { useRef } from 'react'
+import { useScroll } from 'framer-motion'
+import { QuantumCanvas } from '@/features/quantum-canvas'
+import { HeroSection } from '@/widgets/hero-section'
+import { WavesSection } from '@/widgets/waves-section'
+import { ForgeSection } from '@/widgets/forge-section'
+import { AwakeningSection } from '@/widgets/awakening-section'
+import { SCROLL_PAGES } from '@/shared/lib/constants'
 
-/* ─── Particle config ─── */
-const PARTICLE_COUNT = 40
-
-interface ParticleStyle {
-  left: string
-  animationDuration: string
-  animationDelay: string
-  width: string
-  height: string
-  boxShadow: string
-}
-
-function generateParticleStyles(): ParticleStyle[] {
-  return Array.from({ length: PARTICLE_COUNT }, () => {
-    const size = Math.random() * 2 + 1
-    const glow = size > 2 ? `0 0 ${size * 3}px rgba(224, 231, 255, 0.3)` : 'none'
-    return {
-      left: `${Math.random() * 100}%`,
-      animationDuration: `${Math.random() * 15 + 10}s`,
-      animationDelay: `${Math.random() * 20}s`,
-      width: `${size}px`,
-      height: `${size}px`,
-      boxShadow: glow,
-    }
-  })
-}
-
-const particles = generateParticleStyles()
-
-/* ─── App ─── */
 export default function App() {
-  const glowRef = useRef<HTMLDivElement>(null)
-
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    const glow = glowRef.current
-    if (!glow) return
-    glow.style.left = `${e.clientX}px`
-    glow.style.top = `${e.clientY}px`
-    glow.classList.add('cursor-glow--visible')
-  }, [])
-
-  const handleMouseLeave = useCallback(() => {
-    glowRef.current?.classList.remove('cursor-glow--visible')
-  }, [])
-
-  useEffect(() => {
-    // External system sync — mouse tracking for ambient glow
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseleave', handleMouseLeave)
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseleave', handleMouseLeave)
-    }
-  }, [handleMouseMove, handleMouseLeave])
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const { scrollYProgress } = useScroll({ container: scrollRef })
 
   return (
-    <>
-      {/* Cursor-follow ambient glow */}
-      <div ref={glowRef} className="cursor-glow" />
+    <div
+      ref={scrollRef}
+      className="h-screen overflow-y-auto overflow-x-hidden bg-void"
+    >
+      {/* Fixed full-screen R3F canvas — behind everything */}
+      <div className="fixed inset-0 z-0">
+        <QuantumCanvas progress={scrollYProgress} />
+      </div>
 
-      <section className="hero">
-        {/* Background layers */}
-        <div className="hero__bg" />
-        <div className="hero__glow" />
-        <div className="hero__field" />
+      {/* Scrollable content — floats above the canvas */}
+      <div
+        className="relative z-10"
+        style={{ height: `${SCROLL_PAGES * 100}vh` }}
+      >
+        {/* STATE 1: Quantum Jitter (0%) */}
+        <HeroSection />
 
-        {/* Floating particles */}
-        <div className="particles">
-          {particles.map((style, i) => (
-            <div key={i} className="particle" style={style} />
-          ))}
-        </div>
+        {/* STATE 2: Transverse Waves (33%) */}
+        <WavesSection scrollRef={scrollRef} />
 
-        {/* Content */}
-        <div className="hero__content">
-          <h1 className="hero__title">ZPE</h1>
+        {/* STATE 3: The Forge (66%) */}
+        <ForgeSection scrollRef={scrollRef} />
 
-          <p className="hero__subtitle">
-            Zero-Point Energy
-          </p>
-
-          <hr className="hero__divider" />
-
-          <p className="hero__tagline">
-            The energy that persists when everything else is gone.
-            The irreducible hum of the quantum vacuum.
-          </p>
-
-          <a
-            href="mailto:hello@zpe.vc"
-            className="hero__cta"
-          >
-            <span>Get in Touch</span>
-          </a>
-        </div>
-
-        {/* Footer */}
-        <footer className="footer">
-          <p className="footer__text">© 2026 ZPE Ventures</p>
-        </footer>
-      </section>
-    </>
+        {/* STATE 4: The Awakening (100%) */}
+        <AwakeningSection scrollRef={scrollRef} />
+      </div>
+    </div>
   )
 }

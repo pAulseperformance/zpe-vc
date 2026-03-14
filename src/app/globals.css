@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════
+   ZPE — Quantum Design Tokens
+   Inside @layer base per Rule 15
+   ═══════════════════════════════════════════ */
+
+@layer base {
+  :root {
+    --void: #050507;
+    --void-lighter: #0a0a0f;
+    --cosmic-blue: #1a1a4e;
+    --cosmic-blue-glow: rgba(26, 26, 78, 0.4);
+    --electric-purple: #6b21a8;
+    --electric-purple-glow: rgba(107, 33, 168, 0.3);
+    --cold-white: #e0e7ff;
+    --cold-white-dim: rgba(224, 231, 255, 0.6);
+    --cold-white-ghost: rgba(224, 231, 255, 0.08);
+    --accent-blue: #3b5bdb;
+    --font-primary: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    font-family: var(--font-primary);
+    background: var(--void);
+    color: var(--cold-white);
+  }
+
+  ::selection {
+    background: var(--electric-purple);
+    color: var(--cold-white);
+  }
+}
+
+/* ═══════════════════════════════════════════
+   Custom Tailwind Theme
+   ═══════════════════════════════════════════ */
+
+@theme {
+  --color-void: #050507;
+  --color-void-lighter: #0a0a0f;
+  --color-cosmic-blue: #1a1a4e;
+  --color-electric-purple: #6b21a8;
+  --color-cold-white: #e0e7ff;
+  --color-cold-white-dim: rgba(224, 231, 255, 0.6);
+  --color-cold-white-ghost: rgba(224, 231, 255, 0.08);
+  --font-family-primary: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+}
