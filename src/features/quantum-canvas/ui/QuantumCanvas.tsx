@@ -30,9 +30,10 @@ interface ShaderPlaneProps {
   simMouseActive: boolean
   simMousePos: MutableRefObject<{x: number, y: number}>
   gravBodyPositions: MutableRefObject<{click: {x: number, y: number}, mouse: {x: number, y: number}} | null>
+  onZoomChange: (delta: number) => void
 }
 
-function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions }: ShaderPlaneProps) {
+function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange }: ShaderPlaneProps) {
   const meshRef = useRef<THREE.Mesh>(null)
   const { size } = useThree()
 
@@ -121,6 +122,14 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
   const onPointerLeave = useCallback(() => {
     prevMouseRef.current.copy(mouseRef.current)
   }, [])
+
+  const onWheel = useCallback(
+    (e: ThreeEvent<WheelEvent>) => {
+      const delta = e.deltaY * 0.002
+      onZoomChange(delta)
+    },
+    [onZoomChange]
+  )
 
   useFrame((state, delta) => {
     const mat = meshRef.current?.material as THREE.ShaderMaterial | undefined
@@ -293,6 +302,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
       onPointerMove={onPointerMove}
       onPointerDown={onPointerDown}
       onPointerLeave={onPointerLeave}
+      onWheel={onWheel}
     >
       <planeGeometry args={[2, 2]} />
       <shaderMaterial
@@ -318,9 +328,10 @@ interface QuantumCanvasProps {
   simMouseActive: boolean
   simMousePos: MutableRefObject<{x: number, y: number}>
   gravBodyPositions: MutableRefObject<{click: {x: number, y: number}, mouse: {x: number, y: number}} | null>
+  onZoomChange: (delta: number) => void
 }
 
-export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions }: QuantumCanvasProps) {
+export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange }: QuantumCanvasProps) {
   return (
     <Canvas
       gl={{ antialias: false, alpha: false, powerPreference: 'high-performance' }}
@@ -328,7 +339,7 @@ export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, s
       dpr={[1, 1.5]}
       style={{ background: '#000000', cursor: 'none' }}
     >
-      <ShaderPlane onRip={onRip} tuning={tuning} onEnergyChange={onEnergyChange} energyOverride={energyOverride} simClickQueue={simClickQueue} simMouseActive={simMouseActive} simMousePos={simMousePos} gravBodyPositions={gravBodyPositions} />
+      <ShaderPlane onRip={onRip} tuning={tuning} onEnergyChange={onEnergyChange} energyOverride={energyOverride} simClickQueue={simClickQueue} simMouseActive={simMouseActive} simMousePos={simMousePos} gravBodyPositions={gravBodyPositions} onZoomChange={onZoomChange} />
       <EffectComposer>
         <Bloom
           intensity={1.5}

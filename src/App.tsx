@@ -62,6 +62,16 @@ export default function App() {
     audio.update(energy, tuning.ripThreshold, interferenceRatio)
   }, [audio, tuning.ripThreshold])
 
+  const handleZoomChange = useCallback((delta: number) => {
+    setTuning(prev => {
+      const current = prev.viewScale ?? 1.0
+      let next = current + delta
+      next = Math.max(0.5, Math.min(3.0, next))
+      if (next === current) return prev
+      return { ...prev, viewScale: next, zoomMode: 0 }
+    })
+  }, [setTuning])
+
   const handleBootDone = useCallback(() => {
     setDevUnlocked(true)
   }, [])
@@ -84,6 +94,7 @@ export default function App() {
             simMouseActive={simMouseActive}
             simMousePos={simMousePosRef}
             gravBodyPositions={gravBodyPositionsRef}
+            onZoomChange={handleZoomChange}
           />
         </Suspense>
       </motion.div>
