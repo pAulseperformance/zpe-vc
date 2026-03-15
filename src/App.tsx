@@ -157,14 +157,16 @@ export default function App() {
     let synthY = mouseY
     if (useHand) {
       // Route hand axes through configurable mappings
+      // Fallback to 0.5 (neutral center) — NOT mouseX/mouseY, because
+      // the canvas already overrides mouseRef with hand position
       const filterVal = hand.getTargetValue('filter')
       const pitchVal = hand.getTargetValue('pitch')
       const volumeVal = hand.getTargetValue('volume')
       const delayVal = hand.getTargetValue('delayMix')
       const reverbVal = hand.getTargetValue('reverbMix')
 
-      synthX = filterVal ?? mouseX
-      synthY = pitchVal ?? mouseY
+      synthX = filterVal ?? 0.5
+      synthY = pitchVal ?? 0.5
 
       // Apply volume/FX targets from hand axes
       if (volumeVal !== null) audio.setDroneVolume(volumeVal)
