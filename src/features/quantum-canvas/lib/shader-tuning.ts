@@ -148,7 +148,7 @@ export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
   'Pulsar': {
     ...DEFAULT_TUNING,
     paletteMode: 0, // Physical
-    wavelength: 3,  // X-Ray (Diamond)
+    wavelength: 2,  // Visible / HUMAN
     waveSpeed: 0.10, // Slow creeping phase
     waveFreq: 10,
     waveWidth: 0.005,
@@ -187,7 +187,12 @@ export interface SliderDef {
   step: number
 }
 
-export const SLIDERS: SliderDef[] = [
+export const MOUSE_SLIDERS: SliderDef[] = [
+  { key: 'hoverRadius', label: 'Hover Radius', min: 0.05, max: 0.6, step: 0.05 },
+  { key: 'hoverWarp', label: 'Hover Warp', min: 0.0, max: 1.0, step: 0.05 },
+]
+
+export const OBJECT_SLIDERS: SliderDef[] = [
   { key: 'waveSpeed', label: 'Wave Speed', min: 0.1, max: 2.0, step: 0.05 },
   { key: 'waveFreq', label: 'Wave Freq', min: 10, max: 150, step: 5 },
   { key: 'waveWidth', label: 'Wave Width', min: 0.005, max: 0.1, step: 0.005 },
@@ -197,17 +202,21 @@ export const SLIDERS: SliderDef[] = [
   { key: 'maxWaves', label: 'Max Waves', min: 5, max: 100, step: 5 },
   { key: 'lenzStrength', label: 'Lenz Strength', min: 0.0, max: 0.5, step: 0.005 },
   { key: 'lenzWake', label: 'Lenz Wake', min: 0.0, max: 0.6, step: 0.01 },
-  { key: 'hoverRadius', label: 'Hover Radius', min: 0.05, max: 0.6, step: 0.05 },
-  { key: 'hoverWarp', label: 'Hover Warp', min: 0.0, max: 1.0, step: 0.05 },
   { key: 'energyDecay', label: 'Energy Decay/s', min: 2, max: 30, step: 1 },
   { key: 'velocityMult', label: 'Velocity Mult', min: 5, max: 60, step: 5 },
   { key: 'clickSpike', label: 'Click Spike', min: 5, max: 50, step: 5 },
   { key: 'ripThreshold', label: 'Rip Threshold', min: 30, max: 200, step: 10 },
-  { key: 'parallaxDepth', label: 'Parallax', min: 0.0, max: 0.15, step: 0.005 },
   { key: 'heatDecay', label: 'Heat Decay', min: 0.05, max: 2.0, step: 0.05 },
   { key: 'heatAttack', label: 'Heat Attack', min: 0.0, max: 1.0, step: 0.05 },
   { key: 'heatIntensity', label: 'Heat Intensity', min: 0.0, max: 1.0, step: 0.05 },
   { key: 'interferenceBlend', label: 'Interference', min: 0.0, max: 1.0, step: 0.05 },
+]
+
+export const UNIVERSE_SLIDERS: SliderDef[] = [
+  { key: 'parallaxDepth', label: 'Parallax', min: 0.0, max: 0.15, step: 0.005 },
   { key: 'iridescence', label: 'Iridescence', min: 0.0, max: 1.0, step: 0.05 },
   { key: 'starField', label: 'Star Field', min: 0.0, max: 1.0, step: 0.05 },
 ]
+
+/** All sliders combined (backward compat) */
+export const SLIDERS: SliderDef[] = [...MOUSE_SLIDERS, ...OBJECT_SLIDERS, ...UNIVERSE_SLIDERS]

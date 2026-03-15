@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAutoSim } from '../lib/use-auto-sim'
-import { SLIDERS, DEFAULT_TUNING } from '../lib/shader-tuning'
-import type { ShaderTuning } from '../lib/shader-tuning'
+import { MOUSE_SLIDERS, OBJECT_SLIDERS, UNIVERSE_SLIDERS, DEFAULT_TUNING } from '../lib/shader-tuning'
+import type { ShaderTuning, SliderDef } from '../lib/shader-tuning'
 import { PresetControls } from './PresetControls'
 import { AutoSimControls } from './AutoSimControls'
 import { BarrierControls } from './BarrierControls'
@@ -24,9 +24,11 @@ interface DevPanelProps {
   onSimMouseUpdate: (x: number, y: number) => void
   audioEnabled: boolean
   onAudioToggle: (value: boolean) => void
+  hideCursor: boolean
+  onCursorHideChange: (value: boolean) => void
 }
 
-export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle }: DevPanelProps) {
+export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, hideCursor, onCursorHideChange }: DevPanelProps) {
   const [collapsed, setCollapsed] = useState(false)
   const sim = useAutoSim({ onSimClick, onSimMouseActiveChange, onSimMouseUpdate })
 
@@ -44,6 +46,31 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
       </button>
     )
   }
+
+  const renderSliderGroup = (sliders: SliderDef[]) =>
+    sliders.map(({ key, label, min, max, step }) => (
+      <div key={key} className="flex items-center gap-2">
+        <label className="text-[0.55rem] text-cold-white-dim/40 w-20 shrink-0 truncate">{label}</label>
+        <input
+          type="range" min={min} max={tuning.godMode ? max * 50 : max} step={step}
+          value={tuning[key] as number}
+          onChange={(e) => handleChange(key, parseFloat(e.target.value))}
+          className="flex-1 h-1 accent-electric-purple"
+        />
+        {tuning.godMode ? (
+          <input 
+            type="number" 
+            value={tuning[key] as number} 
+            onChange={(e) => handleChange(key, parseFloat(e.target.value) || 0)}
+            className="text-[0.55rem] w-12 text-right tabular-nums bg-transparent border-b border-electric-purple/50 text-electric-purple outline-none appearance-none"
+          />
+        ) : (
+          <span className="text-[0.55rem] w-10 text-right tabular-nums">
+            {(tuning[key] as number).toFixed(step < 1 ? (step < 0.01 ? 3 : 2) : 0)}
+          </span>
+        )}
+      </div>
+    ))
 
   return (
     <div className="fixed top-3 right-3 z-50 w-72 bg-black/90 border border-electric-purple/30 rounded-lg p-3 font-mono text-xs text-cold-white-dim backdrop-blur-sm">
@@ -85,38 +112,32 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           ⚡ God Mode
         </button>
         <button 
-          onClick={() => handleChange('pointerHover', !tuning.pointerHover)}
-          className={`flex-1 text-[0.6rem] uppercase tracking-wider border px-2 py-1 rounded transition-colors ${tuning.pointerHover ? 'border-electric-purple bg-electric-purple/20 text-electric-purple shadow-[0_0_10px_rgba(155,81,224,0.3)]' : 'border-cold-white-dim/20 text-cold-white-dim/50 hover:border-cold-white-dim/40'}`}
+          onClick={() => onCursorHideChange(!hideCursor)}
+          className={`flex-1 text-[0.6rem] uppercase tracking-wider border px-2 py-1 rounded transition-colors ${hideCursor ? 'border-red-400/50 bg-red-400/10 text-red-400' : 'border-cold-white-dim/20 text-cold-white-dim/50 hover:border-cold-white-dim/40'}`}
         >
-          🖱 Hover Warp
+          {hideCursor ? '🚫 Cursor Off' : '🖱 Cursor On'}
         </button>
       </div>
 
-      {/* Sliders */}
+      {/* Grouped Sliders */}
       <div className="space-y-1.5 max-h-[40vh] overflow-y-auto pr-1">
-        {SLIDERS.map(({ key, label, min, max, step }) => (
-          <div key={key} className="flex items-center gap-2">
-            <label className="text-[0.55rem] text-cold-white-dim/40 w-20 shrink-0 truncate">{label}</label>
-            <input
-              type="range" min={min} max={tuning.godMode ? max * 50 : max} step={step}
-              value={tuning[key] as number}
-              onChange={(e) => handleChange(key, parseFloat(e.target.value))}
-              className="flex-1 h-1 accent-electric-purple"
-            />
-            {tuning.godMode ? (
-              <input 
-                type="number" 
-                value={tuning[key] as number} 
-                onChange={(e) => handleChange(key, parseFloat(e.target.value) || 0)}
-                className="text-[0.55rem] w-12 text-right tabular-nums bg-transparent border-b border-electric-purple/50 text-electric-purple outline-none appearance-none"
-              />
-            ) : (
-              <span className="text-[0.55rem] w-10 text-right tabular-nums">
-                {(tuning[key] as number).toFixed(step < 1 ? (step < 0.01 ? 3 : 2) : 0)}
-              </span>
-            )}
-          </div>
-        ))}
+        {/* Mouse / God Object */}
+        <div className="text-[0.55rem] text-electric-purple/50 uppercase tracking-widest mt-1 mb-0.5 border-b border-electric-purple/10 pb-0.5">🖱 Mouse (God Object)</div>
+        <button 
+          onClick={() => handleChange('pointerHover', !tuning.pointerHover)}
+          className={`text-[0.55rem] w-full text-left px-1 py-0.5 rounded border mb-1 transition-colors ${tuning.pointerHover ? 'border-electric-purple/30 text-electric-purple bg-electric-purple/10' : 'border-cold-white-dim/10 text-cold-white-dim/30'}`}
+        >
+          {tuning.pointerHover ? '☑ Hover Warp Active' : '☐ Hover Warp Disabled'}
+        </button>
+        {renderSliderGroup(MOUSE_SLIDERS)}
+
+        {/* Click Object */}
+        <div className="text-[0.55rem] text-electric-purple/50 uppercase tracking-widest mt-2 mb-0.5 border-b border-electric-purple/10 pb-0.5">💥 Click Object (EM Waves)</div>
+        {renderSliderGroup(OBJECT_SLIDERS)}
+
+        {/* Universe */}
+        <div className="text-[0.55rem] text-electric-purple/50 uppercase tracking-widest mt-2 mb-0.5 border-b border-electric-purple/10 pb-0.5">🌌 Universe</div>
+        {renderSliderGroup(UNIVERSE_SLIDERS)}
       </div>
 
       <PresetControls

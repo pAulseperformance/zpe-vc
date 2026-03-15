@@ -19,6 +19,7 @@ export default function App() {
   const [simMouseActive, setSimMouseActive] = useState(false)
   const simMousePosRef = useRef({ x: 0.5, y: 0.5 })
   const [audioEnabled, setAudioEnabled] = useState(false)
+  const [hideCursor, setHideCursor] = useState(true)
   const audio = useQuantumAudio()
 
   // Dev mode — unlocked after rip boot sequence OR always in dev
@@ -70,7 +71,7 @@ export default function App() {
         className="absolute inset-0 z-0"
         animate={{ opacity: isForging ? 0 : 1 }}
         transition={{ duration: 1.5, delay: isForging ? 0.3 : 0 }}
-        style={{ pointerEvents: isForging ? 'none' : 'auto' }}
+        style={{ pointerEvents: isForging ? 'none' : 'auto', cursor: hideCursor ? 'none' : 'crosshair' }}
       >
         <QuantumCanvas
           onRip={onRip}
@@ -113,6 +114,8 @@ export default function App() {
           onSimMouseUpdate={handleSimMouseUpdate}
           audioEnabled={audioEnabled}
           onAudioToggle={setAudioEnabled}
+          hideCursor={hideCursor}
+          onCursorHideChange={setHideCursor}
         />
       )}
     </div>
