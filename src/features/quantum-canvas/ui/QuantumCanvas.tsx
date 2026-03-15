@@ -8,7 +8,7 @@ import fragmentShader from '../lib/shaders/quantum.frag'
 import type { ShaderTuning } from './DevPanel'
 
 /* ─── Constants ─── */
-const MAX_CATALYSTS = 10
+const MAX_CATALYSTS = 100
 
 /* ─── Catalyst Type ─── */
 interface Catalyst {
@@ -52,7 +52,8 @@ function ShaderPlane({ onRip, tuning, onEnergyChange }: ShaderPlaneProps) {
       uWaveSpeed: { value: tuning.waveSpeed },
       uWaveFreq: { value: tuning.waveFreq },
       uWaveWidth: { value: tuning.waveWidth },
-      uWaveDamping: { value: tuning.waveDamping },
+      uEmDamping: { value: tuning.emDamping },
+      uGravDamping: { value: tuning.gravDamping },
       uLenzStrength: { value: tuning.lenzStrength },
       uLenzWake: { value: tuning.lenzWake },
       uHoverRadius: { value: tuning.hoverRadius },
@@ -80,10 +81,11 @@ function ShaderPlane({ onRip, tuning, onEnergyChange }: ShaderPlaneProps) {
     (e: ThreeEvent<PointerEvent>) => {
       energyRef.current += tuningRef.current.clickSpike
 
+      const maxW = Math.floor(tuningRef.current.maxWaves)
       if (e.uv) {
         const cats = catalystsRef.current
         cats.push({ x: e.uv.x, y: e.uv.y, time: -1 })
-        if (cats.length > MAX_CATALYSTS) cats.shift()
+        if (cats.length > maxW) cats.shift()
       }
     },
     []
@@ -156,7 +158,8 @@ function ShaderPlane({ onRip, tuning, onEnergyChange }: ShaderPlaneProps) {
     mat.uniforms.uWaveSpeed.value = t.waveSpeed
     mat.uniforms.uWaveFreq.value = t.waveFreq
     mat.uniforms.uWaveWidth.value = t.waveWidth
-    mat.uniforms.uWaveDamping.value = t.waveDamping
+    mat.uniforms.uEmDamping.value = t.emDamping
+    mat.uniforms.uGravDamping.value = t.gravDamping
     mat.uniforms.uLenzStrength.value = t.lenzStrength
     mat.uniforms.uLenzWake.value = t.lenzWake
     mat.uniforms.uHoverRadius.value = t.hoverRadius
@@ -201,7 +204,7 @@ export function QuantumCanvas({ onRip, tuning, onEnergyChange }: QuantumCanvasPr
       gl={{ antialias: false, alpha: false, powerPreference: 'high-performance' }}
       camera={{ position: [0, 0, 1] }}
       dpr={[1, 1.5]}
-      style={{ background: '#000000', cursor: 'crosshair' }}
+      style={{ background: '#000000', cursor: 'none' }}
     >
       <ShaderPlane onRip={onRip} tuning={tuning} onEnergyChange={onEnergyChange} />
       <EffectComposer>

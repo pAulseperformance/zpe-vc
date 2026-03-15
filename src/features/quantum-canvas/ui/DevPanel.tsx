@@ -4,8 +4,10 @@ export interface ShaderTuning {
   waveSpeed: number
   waveFreq: number
   waveWidth: number
-  waveDamping: number
+  emDamping: number
+  gravDamping: number
   waveLifetime: number
+  maxWaves: number
   lenzStrength: number
   lenzWake: number
   hoverRadius: number
@@ -23,8 +25,10 @@ export const DEFAULT_TUNING: ShaderTuning = {
   waveSpeed: 1.15,
   waveFreq: 150,
   waveWidth: 0.1,
-  waveDamping: 0.5,
+  emDamping: 0.5,
+  gravDamping: 0.2,
   waveLifetime: 15,
+  maxWaves: 10,
   lenzStrength: 0.5,
   lenzWake: 0.6,
   hoverRadius: 0.05,
@@ -53,8 +57,10 @@ const SLIDERS: SliderDef[] = [
   { key: 'waveSpeed', label: 'Wave Speed', min: 0.1, max: 2.0, step: 0.05 },
   { key: 'waveFreq', label: 'Wave Freq', min: 10, max: 150, step: 5 },
   { key: 'waveWidth', label: 'Wave Width', min: 0.005, max: 0.1, step: 0.005 },
-  { key: 'waveDamping', label: 'Wave Damping', min: 0.5, max: 10, step: 0.5 },
+  { key: 'emDamping', label: 'EM Damping', min: 0.1, max: 10, step: 0.1 },
+  { key: 'gravDamping', label: 'Grav Damping', min: 0.05, max: 5, step: 0.05 },
   { key: 'waveLifetime', label: 'Wave Life (s)', min: 1, max: 15, step: 0.5 },
+  { key: 'maxWaves', label: 'Max Waves', min: 5, max: 100, step: 5 },
   { key: 'lenzStrength', label: 'Lenz Strength', min: 0.0, max: 0.5, step: 0.005 },
   { key: 'lenzWake', label: 'Lenz Wake', min: 0.0, max: 0.6, step: 0.01 },
   { key: 'hoverRadius', label: 'Hover Radius', min: 0.05, max: 0.6, step: 0.05 },

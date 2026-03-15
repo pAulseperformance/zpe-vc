@@ -15,15 +15,16 @@ uniform float uEnergy;
 uniform float uRipFlash;
 
 // ─── Catalyst Uniforms ───
-uniform vec2  uCatalysts[10];
-uniform float uCatalystTimes[10];
+uniform vec2  uCatalysts[100];
+uniform float uCatalystTimes[100];
 uniform int   uCatalystCount;
 
 // ─── Tunable Uniforms ───
 uniform float uWaveSpeed;
 uniform float uWaveFreq;
 uniform float uWaveWidth;
-uniform float uWaveDamping;
+uniform float uEmDamping;
+uniform float uGravDamping;
 uniform float uLenzStrength;
 uniform float uLenzWake;
 uniform float uHoverRadius;
@@ -126,7 +127,7 @@ void main() {
   vec2 lenzDisplacement = vec2(0.0);
   float spectrumAccum = 0.0;          // For chromatic dispersion base
 
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 100; i++) {
     if (i >= uCatalystCount) break;
 
     float age = t - uCatalystTimes[i];
@@ -147,8 +148,8 @@ void main() {
 
     float waveFront = age * uWaveSpeed;
 
-    float emDamping = exp(-age * uWaveDamping);
-    float lenzDamping = exp(-age * uWaveDamping * 0.35);
+    float emDamping = exp(-age * uEmDamping);
+    float lenzDamping = exp(-age * uGravDamping);
 
     // Wavefront ring
     float frontDist = abs(dist - waveFront);
@@ -181,7 +182,7 @@ void main() {
     heatResidual += wavePassed * exp(-age * uHeatDecay);
 
     // ── Lenz collapse ──
-    float collapsePhase = clamp(age * uWaveDamping * 0.5, 0.0, 1.0);
+    float collapsePhase = clamp(age * uGravDamping * 0.5, 0.0, 1.0);
     float effectiveWake = uLenzWake * (1.0 - collapsePhase);
     float behindFront = smoothstep(waveFront, waveFront - max(effectiveWake, 0.001), rawDist);
     float pointCollapse = exp(-rawDist * rawDist * (20.0 + collapsePhase * 300.0));
