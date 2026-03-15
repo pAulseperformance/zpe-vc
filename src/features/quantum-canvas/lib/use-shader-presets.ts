@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import type { ShaderTuning } from './shader-tuning'
 import { DEFAULT_TUNING } from './shader-tuning'
 
-const STORAGE_KEY = 'zpe-shader-presets'
-const ACTIVE_KEY = 'zpe-shader-active'
+const STORAGE_KEY = 'zpe-shader-presets-v2'
+const ACTIVE_KEY = 'zpe-shader-active-v2'
 
 export type PresetMap = Record<string, ShaderTuning>
 
