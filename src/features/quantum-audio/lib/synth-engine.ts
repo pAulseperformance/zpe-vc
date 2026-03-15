@@ -10,6 +10,9 @@
  *   OscB (-7¢) ─┘
  */
 
+import { snapToScale } from './quantizer'
+import type { ScaleName } from './quantizer'
+
 export type SynthWaveform = 'sine' | 'sawtooth' | 'square' | 'triangle'
 
 export interface FFTBands {
@@ -39,11 +42,13 @@ export class SynthEngine {
   private nodes: EngineNodes | null = null
   private _active = false
   private smooth: FFTBands = { bass: 0, mid: 0, treble: 0 }
+  private _scale: ScaleName = 'continuous'
 
   /** Current FFT band levels (read per-frame) */
   fft: FFTBands = { bass: 0, mid: 0, treble: 0 }
 
   get active(): boolean { return this._active }
+  get scale(): ScaleName { return this._scale }
 
   // ── Lifecycle ──────────────────────────────────────────
 
@@ -132,6 +137,10 @@ export class SynthEngine {
     n.filter.Q.setTargetAtTime(q, n.ctx.currentTime, 0.05)
   }
 
+  setScale(scale: ScaleName): void {
+    this._scale = scale
+  }
+
   // ── Per-Frame Update ───────────────────────────────────
 
   update(
@@ -147,10 +156,11 @@ export class SynthEngine {
     const now = n.ctx.currentTime
     const eNorm = Math.min(energy / Math.max(maxEnergy, 1), 1)
 
-    // Pitch: mouse Y → C2-C5 (exponential)
+    // Pitch: mouse Y → C2-C5 (exponential), quantized to scale
     if (mouseY !== undefined) {
       const yInv = 1.0 - mouseY
-      const freq = MIN_FREQ * Math.pow(MAX_FREQ / MIN_FREQ, yInv)
+      const rawFreq = MIN_FREQ * Math.pow(MAX_FREQ / MIN_FREQ, yInv)
+      const freq = snapToScale(rawFreq, this._scale)
       n.oscA.frequency.setTargetAtTime(freq, now, 0.08)
       n.oscB.frequency.setTargetAtTime(freq, now, 0.08)
     }

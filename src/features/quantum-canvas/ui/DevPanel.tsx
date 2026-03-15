@@ -9,7 +9,7 @@ import { BarrierControls } from './BarrierControls'
 import { ExportControls } from './ExportControls'
 import { SynthControls } from './SynthControls'
 import { SliderGroup } from './SliderGroup'
-import type { SynthWaveform, FFTBands } from '@/features/quantum-audio'
+import type { SynthWaveform, FFTBands, ScaleName } from '@/features/quantum-audio'
 
 export type { ShaderTuning }
 export { DEFAULT_TUNING } from '../lib/shader-tuning'
@@ -40,10 +40,12 @@ interface DevPanelProps {
   onSynthFilterQ: (q: number) => void
   audioReactive: boolean
   onAudioReactive: (v: boolean) => void
+  synthScale: ScaleName
+  onSynthScale: (s: ScaleName) => void
   fftRef: MutableRefObject<FFTBands>
 }
 
-export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, hideCursor, onCursorHideChange, gravBodyPositions, canvasRef, synthWaveform, onSynthWaveform, synthFilterQ, onSynthFilterQ, audioReactive, onAudioReactive, fftRef }: DevPanelProps) {
+export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, hideCursor, onCursorHideChange, gravBodyPositions, canvasRef, synthWaveform, onSynthWaveform, synthFilterQ, onSynthFilterQ, audioReactive, onAudioReactive, synthScale, onSynthScale, fftRef }: DevPanelProps) {
   const [collapsed, setCollapsed] = useState(false)
   const sim = useAutoSim({ onSimClick, onSimMouseActiveChange, onSimMouseUpdate, zoomMode: tuning.zoomMode })
 
@@ -107,6 +109,8 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           onFilterQChange={onSynthFilterQ}
           audioReactive={audioReactive}
           onAudioReactiveChange={onAudioReactive}
+          scale={synthScale}
+          onScaleChange={onSynthScale}
           fftRef={fftRef}
         />
       )}
@@ -193,6 +197,7 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           synthWaveform,
           synthFilterQ,
           audioReactive,
+          synthScale,
           hideCursor,
         }}
         onChange={(loadedTuning) => {
@@ -217,6 +222,7 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           if (loadedTuning.synthWaveform) onSynthWaveform(loadedTuning.synthWaveform)
           if (loadedTuning.synthFilterQ !== undefined) onSynthFilterQ(loadedTuning.synthFilterQ)
           if (loadedTuning.audioReactive !== undefined) onAudioReactive(loadedTuning.audioReactive)
+          if (loadedTuning.synthScale) onSynthScale(loadedTuning.synthScale as ScaleName)
           if (loadedTuning.hideCursor !== undefined) onCursorHideChange(loadedTuning.hideCursor)
         }}
         canvasRef={canvasRef}

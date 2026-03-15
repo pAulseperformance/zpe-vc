@@ -5,7 +5,7 @@ import { DevPanel, usePersistedTuning } from '@/features/quantum-canvas/ui/DevPa
 import { TerminalIntake } from '@/widgets/terminal-intake'
 import { DevModeButton } from '@/widgets/dev-mode-button/DevModeButton'
 import { useSynth } from '@/features/quantum-audio'
-import type { SynthWaveform } from '@/features/quantum-audio'
+import type { SynthWaveform, ScaleName } from '@/features/quantum-audio'
 
 const IS_DEV = import.meta.env.DEV
 
@@ -29,6 +29,7 @@ export default function App() {
   const [synthWaveform, setSynthWaveform] = useState<SynthWaveform>('sine')
   const [synthFilterQ, setSynthFilterQ] = useState(2.0)
   const [audioReactive, setAudioReactive] = useState(true)
+  const [synthScale, setSynthScale] = useState<ScaleName>('continuous')
 
   // Dev mode — unlocked after rip boot sequence OR always in dev
   const [devUnlocked, setDevUnlocked] = useState(IS_DEV)
@@ -178,6 +179,8 @@ export default function App() {
           onSynthFilterQ={(q) => { setSynthFilterQ(q); audio.setFilterQ(q) }}
           audioReactive={audioReactive}
           onAudioReactive={setAudioReactive}
+          synthScale={synthScale}
+          onSynthScale={(s) => { setSynthScale(s); audio.setScale(s) }}
           fftRef={audio.fftRef}
         />
       )}

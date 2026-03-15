@@ -1,6 +1,7 @@
 import { useRef, useCallback, type MutableRefObject } from 'react'
 import { SynthEngine } from '../lib/synth-engine'
 import type { SynthWaveform, FFTBands } from '../lib/synth-engine'
+import type { ScaleName } from '../lib/quantizer'
 
 /**
  * Thin React wrapper around the pure-TS SynthEngine.
@@ -38,6 +39,10 @@ export function useSynth() {
     getEngine().setFilterQ(q)
   }, [])
 
+  const setScale = useCallback((scale: ScaleName) => {
+    getEngine().setScale(scale)
+  }, [])
+
   const update = useCallback((
     energy: number,
     maxEnergy: number,
@@ -61,10 +66,10 @@ export function useSynth() {
 
   return {
     start, stop, update, triggerClick, playNote,
-    setWaveform, setFilterQ,
+    setWaveform, setFilterQ, setScale,
     activeRef,
     fftRef: fftRef as MutableRefObject<FFTBands>,
   }
 }
 
-export type { SynthWaveform, FFTBands }
+export type { SynthWaveform, FFTBands, ScaleName }

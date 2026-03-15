@@ -52,6 +52,7 @@ export interface ShaderTuning {
   synthWaveform?: 'sine' | 'sawtooth' | 'square' | 'triangle'
   synthFilterQ?: number
   audioReactive?: boolean
+  synthScale?: string   // Scale quantizer: 'continuous' | 'minor-pentatonic' | etc.
   // UI
   hideCursor?: boolean
 }
@@ -100,6 +101,7 @@ export const DEFAULT_TUNING: ShaderTuning = {
   synthWaveform: 'sine',
   synthFilterQ: 2.0,
   audioReactive: true,
+  synthScale: 'continuous',
   // UI defaults
   hideCursor: true,
 }

@@ -1,5 +1,5 @@
 import type { MutableRefObject } from 'react'
-import type { SynthWaveform, FFTBands } from '@/features/quantum-audio'
+import type { SynthWaveform, FFTBands, ScaleName } from '@/features/quantum-audio'
 
 interface SynthControlsProps {
   waveform: SynthWaveform
@@ -8,6 +8,8 @@ interface SynthControlsProps {
   onFilterQChange: (q: number) => void
   audioReactive: boolean
   onAudioReactiveChange: (v: boolean) => void
+  scale: ScaleName
+  onScaleChange: (s: ScaleName) => void
   fftRef: MutableRefObject<FFTBands>
 }
 
@@ -19,10 +21,21 @@ const WF_LABELS: Record<SynthWaveform, string> = {
   triangle: '△ Triangle',
 }
 
+const SCALE_LIST: ScaleName[] = ['continuous', 'minor-pentatonic', 'major-pentatonic', 'harmonic-minor', 'lydian', 'dorian']
+const SCALE_LABELS: Record<ScaleName, string> = {
+  'continuous': '∿ Free',
+  'minor-pentatonic': '♭ Min Penta',
+  'major-pentatonic': '♯ Maj Penta',
+  'harmonic-minor': '♭ Harm Min',
+  'lydian': '♯ Lydian',
+  'dorian': '♭ Dorian',
+}
+
 export function SynthControls({
   waveform, onWaveformChange,
   filterQ, onFilterQChange,
   audioReactive, onAudioReactiveChange,
+  scale, onScaleChange,
   fftRef,
 }: SynthControlsProps) {
   const bands = fftRef.current
@@ -42,6 +55,20 @@ export function SynthControls({
           className="text-[0.55rem] text-cold-white-dim/50 hover:text-electric-purple border border-cold-white-dim/10 rounded px-2 py-0.5"
         >
           {WF_LABELS[waveform]}
+        </button>
+      </div>
+
+      {/* Scale quantizer */}
+      <div className="flex items-center gap-2 mt-1.5">
+        <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Scale</span>
+        <button
+          onClick={() => {
+            const idx = SCALE_LIST.indexOf(scale)
+            onScaleChange(SCALE_LIST[(idx + 1) % SCALE_LIST.length])
+          }}
+          className="text-[0.55rem] text-cold-white-dim/50 hover:text-electric-purple border border-cold-white-dim/10 rounded px-2 py-0.5"
+        >
+          {SCALE_LABELS[scale]}
         </button>
       </div>
 
