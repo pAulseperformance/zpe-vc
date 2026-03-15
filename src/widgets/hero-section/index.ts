@@ -1,1 +1,1 @@
-export { HeroSection } from './ui/HeroSection'
+export { HeroOverlay } from './ui/HeroSection'

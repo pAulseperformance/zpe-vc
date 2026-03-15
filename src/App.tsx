@@ -1,43 +1,28 @@
-import { useRef } from 'react'
-import { useScroll } from 'framer-motion'
-import { QuantumCanvas } from '@/features/quantum-canvas'
-import { HeroSection } from '@/widgets/hero-section'
-import { WavesSection } from '@/widgets/waves-section'
-import { ForgeSection } from '@/widgets/forge-section'
-import { AwakeningSection } from '@/widgets/awakening-section'
-import { SCROLL_PAGES } from '@/shared/lib/constants'
+import { useState, useMemo } from 'react'
+import { QuantumCanvas, type SandboxCallbacks } from '@/features/quantum-canvas'
+import { HeroOverlay } from '@/widgets/hero-section'
 
 export default function App() {
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const { scrollYProgress } = useScroll({ container: scrollRef })
+  const [hasHovered, setHasHovered] = useState(false)
+  const [hasReleased, setHasReleased] = useState(false)
+
+  const callbacks: SandboxCallbacks = useMemo(
+    () => ({
+      onFirstHover: () => setHasHovered(true),
+      onFirstRelease: () => setHasReleased(true),
+    }),
+    []
+  )
 
   return (
-    <div
-      ref={scrollRef}
-      className="h-screen overflow-y-auto overflow-x-hidden bg-black"
-    >
-      {/* Fixed full-screen R3F canvas — behind everything */}
-      <div className="fixed inset-0 z-0">
-        <QuantumCanvas progress={scrollYProgress} />
+    <div className="relative h-screen w-screen bg-black overflow-hidden">
+      {/* Full-screen interactive R3F canvas */}
+      <div className="absolute inset-0 z-0">
+        <QuantumCanvas callbacks={callbacks} />
       </div>
 
-      {/* Scrollable content — floats above the canvas */}
-      <div
-        className="relative z-10"
-        style={{ height: `${SCROLL_PAGES * 100}vh` }}
-      >
-        {/* STATE 1: Quantum Jitter (0%) — stealth load */}
-        <HeroSection scrollRef={scrollRef} />
-
-        {/* STATE 2: Transverse Waves (33%) */}
-        <WavesSection scrollRef={scrollRef} />
-
-        {/* STATE 3: The Forge (66%) */}
-        <ForgeSection scrollRef={scrollRef} />
-
-        {/* STATE 4: The Awakening (100%) */}
-        <AwakeningSection scrollRef={scrollRef} />
-      </div>
+      {/* Floating UI overlay */}
+      <HeroOverlay showText={hasHovered} showCta={hasReleased} />
     </div>
   )
 }

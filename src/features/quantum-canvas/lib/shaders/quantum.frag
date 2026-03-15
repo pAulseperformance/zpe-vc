@@ -1,7 +1,6 @@
 // ═══════════════════════════════════════════════════════════
-// ZPE — "The Cosmic Assembly Line" Fragment Shader v2
-// Refined from Stitch visual references
-// 4-state scroll-morphing: Jitter → Waves → Forge → Awakening
+// ZPE — "The Interactive Sandbox" Fragment Shader
+// Mouse/touch-reactive: Idle → Hover → Press → Release
 // ═══════════════════════════════════════════════════════════
 
 precision highp float;
@@ -9,15 +8,20 @@ precision highp float;
 varying vec2 vUv;
 
 uniform float uTime;
-uniform float uProgress;    // 0.0 → 1.0 scroll progress
 uniform vec2  uResolution;
+uniform vec2  uMouse;          // Normalized mouse pos (0..1, aspect-corrected)
+uniform float uHoverStrength;  // 0→1 smoothly interpolated hover intensity
+uniform float uPressStrength;  // 0→1 smoothly interpolated press intensity
+uniform float uReleaseAnim;    // 0→1 release shatter animation progress
+uniform vec2  uReleaseOrigin;  // Where the press was released
 
 // ─── Palette ───
-const vec3 VOID      = vec3(0.020, 0.020, 0.027);
+const vec3 VOID      = vec3(0.0);
 const vec3 PURPLE    = vec3(0.260, 0.080, 0.420);
 const vec3 DEEP_PURP = vec3(0.120, 0.030, 0.200);
 const vec3 BLUE      = vec3(0.080, 0.080, 0.220);
 const vec3 WHITE     = vec3(0.878, 0.906, 1.000);
+const vec3 FORGE_HOT = vec3(0.95, 0.55, 0.25);
 
 // ─── Noise ───
 vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -51,7 +55,6 @@ float hash(vec2 p) {
   return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
 }
 
-// FBM — multi-octave turbulence
 float fbm(vec2 p, int octaves) {
   float value = 0.0;
   float amp = 0.5;
@@ -65,245 +68,200 @@ float fbm(vec2 p, int octaves) {
   return value;
 }
 
-// ═══════════════════════════════════════════════════════════
-// STATE 1: Quantum Jitter — dark, ethereal boiling quantum vacuum
-// Zero-point energy: restless churning foam of virtual particles
-// ═══════════════════════════════════════════════════════════
-vec3 quantumJitter(vec2 uv, float t) {
-  vec2 c = uv - 0.5;
-  float dist = length(c);
-
-  // ── Domain-warped FBM: the "boiling soup" ──
-  // Feed noise into noise for organic, churning turbulence
-  float slow = t * 0.06;
-  float mid  = t * 0.12;
-
-  // First warp layer — large-scale flow direction
-  vec2 warp1 = vec2(
-    fbm(uv * 3.0 + vec2(slow, -slow * 0.7), 4),
-    fbm(uv * 3.0 + vec2(-slow * 0.8, slow * 1.1), 4)
-  );
-
-  // Second warp — feed first warp back in (creates organic churn)
-  vec2 warp2 = vec2(
-    fbm(uv * 3.0 + warp1 * 1.5 + vec2(mid * 0.3, mid), 4),
-    fbm(uv * 3.0 + warp1 * 1.5 + vec2(-mid, mid * 0.5), 4)
-  );
-
-  // Final turbulence field — the boiling texture
-  float boil = fbm(uv * 4.0 + warp2 * 1.2, 5);
-  boil = boil * 0.5 + 0.5; // Remap to 0..1
-
-  // ── Color the boiling soup ──
-  vec3 color = VOID;
-
-  // Deep purple undulation — the primary churning layer
-  float purpleIntensity = boil * exp(-dist * dist * 3.5) * 0.22;
-  color += DEEP_PURP * purpleIntensity;
-
-  // Brighter purple in the bubble peaks
-  float peaks = smoothstep(0.55, 0.75, boil) * exp(-dist * dist * 4.0);
-  color += PURPLE * peaks * 0.18;
-
-  // Cosmic blue in the troughs — creates depth between bubbles
-  float troughs = smoothstep(0.5, 0.3, boil) * exp(-dist * dist * 5.0);
-  color += BLUE * troughs * 0.10;
-
-  // Subtle center glow — the heart of the quantum foam
-  color += PURPLE * exp(-dist * dist * 12.0) * 0.08;
-
-  // ── Virtual particle pops — secondary to the churning ──
-  // Tiny sparkles that appear at the peaks of turbulence
-  float sparkle = snoise(uv * 60.0 + t * 1.8);
-  float pop = smoothstep(0.80, 0.84, sparkle) * smoothstep(0.50, 0.60, boil);
-  pop *= exp(-dist * dist * 4.0);
-  color += WHITE * pop * 0.20;
-
-  // Even tinier purple-white flickers
-  float sparkle2 = snoise(uv * 100.0 - t * 2.5);
-  float pop2 = smoothstep(0.86, 0.89, sparkle2);
-  pop2 *= exp(-dist * dist * 3.5);
-  color += mix(PURPLE, WHITE, 0.6) * pop2 * 0.10;
-
-  // ── Faint energy arcs — ephemeral connections ──
-  float arc = abs(snoise(uv * 12.0 + warp1 * 2.0 + t * 0.15));
-  float arcLine = smoothstep(0.45, 0.48, arc) * (1.0 - smoothstep(0.48, 0.51, arc));
-  arcLine *= exp(-dist * dist * 3.0) * 0.06;
-  color += WHITE * arcLine;
-
-  return color;
-}
-
-
-// ═══════════════════════════════════════════════════════════
-// STATE 2: Transverse Waves — faint thin grid lines
-// Reference: very dark, subtle orthogonal grid, center-visible
-// ═══════════════════════════════════════════════════════════
-vec3 transverseWaves(vec2 uv, float t) {
-  vec2 c = uv - 0.5;
-  float dist = length(c);
-
-  // Grid lines — very thin, very faint
-  float gridFreq = 16.0;
-  float lineX = abs(fract(uv.x * gridFreq) - 0.5);
-  float lineY = abs(fract(uv.y * gridFreq) - 0.5);
-
-  // Sharp thin lines
-  float gridX = 1.0 - smoothstep(0.0, 0.015, lineX);
-  float gridY = 1.0 - smoothstep(0.0, 0.015, lineY);
-  float grid = max(gridX, gridY);
-
-  // Wave displacement on the grid — subtle undulation
-  float waveX = sin(c.y * 20.0 + t * 0.8) * 0.003;
-  float waveY = sin(c.x * 20.0 - t * 0.6) * 0.003;
-  float lineXw = abs(fract((uv.x + waveX) * gridFreq) - 0.5);
-  float lineYw = abs(fract((uv.y + waveY) * gridFreq) - 0.5);
-  float gridXw = 1.0 - smoothstep(0.0, 0.015, lineXw);
-  float gridYw = 1.0 - smoothstep(0.0, 0.015, lineYw);
-  float gridWave = max(gridXw, gridYw);
-
-  // Use wave-displaced grid
-  grid = gridWave;
-
-  // Center-weighted visibility — grid fades at edges
-  float visibility = exp(-dist * dist * 4.0);
-  grid *= visibility;
-
-  // Intersection nodes glow slightly brighter
-  float nodeX = 1.0 - smoothstep(0.0, 0.03, lineXw);
-  float nodeY = 1.0 - smoothstep(0.0, 0.03, lineYw);
-  float nodes = nodeX * nodeY * visibility;
-
-  vec3 color = VOID;
-  color += BLUE * grid * 0.25;           // Faint blue grid lines
-  color += WHITE * grid * 0.04;          // Slight white highlight
-  color += PURPLE * nodes * 0.15;        // Purple at intersections
-
-  // Very subtle background glow
-  color += DEEP_PURP * exp(-dist * dist * 10.0) * 0.03;
-
-  return color;
-}
-
-
-// ═══════════════════════════════════════════════════════════
-// STATE 3: The Forge — focused white-hot core with purple glow
-// Reference: bright white sphere at center, purple radial bloom
-// ═══════════════════════════════════════════════════════════
-vec3 theForge(vec2 uv, float t) {
-  vec2 c = uv - 0.5;
-  float dist = length(c);
-
-  // White-hot core — tight, intense
-  float coreFlicker = 0.95 + 0.05 * sin(t * 6.0 + snoise(c * 3.0 + t) * 2.0);
-  float core = exp(-dist * dist * 200.0) * coreFlicker;
-
-  // Inner glow ring — white bleeding out
-  float innerGlow = exp(-dist * dist * 40.0) * 0.8;
-
-  // Purple bloom — wide, soft
-  float purpleBloom = exp(-dist * dist * 3.0) * 0.35;
-
-  // Accretion streaks — subtle diagonal light rays
-  float angle = atan(c.y, c.x);
-  float rays = pow(abs(sin(angle * 3.0 + t * 0.2)), 16.0);
-  rays *= exp(-dist * 0.8) * 0.08;
-
-  // Spiral suggestion
-  float spiral = sin(angle * 2.0 + dist * 15.0 - t * 1.5);
-  float spiralLine = smoothstep(0.8, 1.0, spiral) * exp(-dist * dist * 8.0) * 0.08;
-
-  vec3 color = VOID;
-
-  // Wide purple atmosphere
-  color += PURPLE * purpleBloom;
-  color += DEEP_PURP * exp(-dist * dist * 2.0) * 0.2;
-
-  // Light rays
-  color += mix(PURPLE, WHITE, 0.3) * rays;
-
-  // Spiral bands
-  color += BLUE * spiralLine;
-
-  // Inner white glow
-  color += WHITE * innerGlow;
-
-  // White-hot center
-  color += WHITE * core;
-
-  return color;
-}
-
-
-// ═══════════════════════════════════════════════════════════
-// STATE 4: The Awakening — hard-edged geometric shapes, scattered
-// Reference: distinct polygons/hexagons drifting against black
-// ═══════════════════════════════════════════════════════════
-
-// Signed distance to a regular polygon
+// Signed distance to regular polygon
 float sdPolygon(vec2 p, float r, float n) {
   float a = atan(p.x, p.y) + 3.14159;
   float s = 6.28318 / n;
   return cos(floor(0.5 + a / s) * s - a) * length(p) - r;
 }
 
-vec3 theAwakening(vec2 uv, float t) {
+
+// ═══════════════════════════════════════════════════════════
+// IDLE: Boiling quantum jitter — domain-warped FBM foam
+// ═══════════════════════════════════════════════════════════
+vec3 idleJitter(vec2 uv, float t) {
   vec2 c = uv - 0.5;
+  float dist = length(c);
+
+  float slow = t * 0.06;
+  float mid  = t * 0.12;
+
+  vec2 warp1 = vec2(
+    fbm(uv * 3.0 + vec2(slow, -slow * 0.7), 4),
+    fbm(uv * 3.0 + vec2(-slow * 0.8, slow * 1.1), 4)
+  );
+  vec2 warp2 = vec2(
+    fbm(uv * 3.0 + warp1 * 1.5 + vec2(mid * 0.3, mid), 4),
+    fbm(uv * 3.0 + warp1 * 1.5 + vec2(-mid, mid * 0.5), 4)
+  );
+
+  float boil = fbm(uv * 4.0 + warp2 * 1.2, 5) * 0.5 + 0.5;
+
+  vec3 color = VOID;
+  color += DEEP_PURP * boil * exp(-dist * dist * 3.5) * 0.22;
+  color += PURPLE * smoothstep(0.55, 0.75, boil) * exp(-dist * dist * 4.0) * 0.18;
+  color += BLUE * smoothstep(0.5, 0.3, boil) * exp(-dist * dist * 5.0) * 0.10;
+  color += PURPLE * exp(-dist * dist * 12.0) * 0.08;
+
+  // Particle pops
+  float pop = smoothstep(0.80, 0.84, snoise(uv * 60.0 + t * 1.8))
+            * smoothstep(0.50, 0.60, boil)
+            * exp(-dist * dist * 4.0);
+  color += WHITE * pop * 0.25;
+
+  float pop2 = smoothstep(0.86, 0.89, snoise(uv * 100.0 - t * 2.5))
+             * exp(-dist * dist * 3.5);
+  color += mix(PURPLE, WHITE, 0.6) * pop2 * 0.12;
+
+  return color;
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// HOVER: Magnetic field — noise ALIGNS into directional waves
+// near the cursor position
+// ═══════════════════════════════════════════════════════════
+vec3 hoverField(vec2 uv, float t, vec2 mouse) {
+  vec2 toMouse = uv - mouse;
+  float mouseDist = length(toMouse);
+  vec2 mouseDir = normalize(toMouse + 0.001);
+
+  // Influence radius — affects noise direction within this range
+  float influence = exp(-mouseDist * mouseDist * 8.0);
+
+  // Directional waves aligned to mouse vector
+  float wavePhase = dot(uv - mouse, mouseDir) * 30.0 + t * 2.0;
+  float wave = sin(wavePhase) * 0.5 + 0.5;
+
+  // Perpendicular cross-waves for the grid feel
+  vec2 perpDir = vec2(-mouseDir.y, mouseDir.x);
+  float crossPhase = dot(uv - mouse, perpDir) * 30.0 - t * 1.5;
+  float crossWave = sin(crossPhase) * 0.5 + 0.5;
+
+  // Combined grid interference
+  float gridPattern = wave * 0.7 + crossWave * 0.3;
+  float gridLines = smoothstep(0.45, 0.5, gridPattern);
+
+  vec3 color = VOID;
+
+  // Aligned wave field — blue/white near cursor
+  color += BLUE * gridLines * influence * 0.4;
+  color += WHITE * smoothstep(0.6, 0.65, gridPattern) * influence * 0.15;
+
+  // Bright point at cursor
+  color += PURPLE * exp(-mouseDist * mouseDist * 60.0) * 0.3;
+
+  // Faint connective nodes
+  float nodes = smoothstep(0.55, 0.6, wave) * smoothstep(0.55, 0.6, crossWave);
+  color += PURPLE * nodes * influence * 0.25;
+
+  return color;
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// PRESS: Extreme gravity — particles pulled to cursor
+// ═══════════════════════════════════════════════════════════
+vec3 pressGravity(vec2 uv, float t, vec2 mouse) {
+  vec2 toMouse = uv - mouse;
+  float mouseDist = length(toMouse);
+  float angle = atan(toMouse.y, toMouse.x);
+
+  // White-hot core at cursor position
+  float core = exp(-mouseDist * mouseDist * 300.0);
+  float innerGlow = exp(-mouseDist * mouseDist * 50.0);
+  float coreFlicker = 0.95 + 0.05 * sin(t * 8.0 + snoise(toMouse * 5.0) * 3.0);
+
+  // Spiral accretion bands pulling into cursor
+  float spiral = sin(angle * 4.0 + mouseDist * 25.0 - t * 3.0);
+  float spiralBand = smoothstep(0.6, 0.9, spiral) * exp(-mouseDist * mouseDist * 6.0);
+
+  // Radial streaks — matter falling in
+  float streaks = pow(abs(sin(angle * 6.0 + t * 0.3)), 12.0);
+  streaks *= exp(-mouseDist * 1.5) * 0.12;
+
+  // Purple bloom
+  float bloom = exp(-mouseDist * mouseDist * 2.5);
+
+  vec3 color = VOID;
+
+  // Purple atmosphere
+  color += PURPLE * bloom * 0.4;
+  color += DEEP_PURP * exp(-mouseDist * mouseDist * 1.5) * 0.25;
+
+  // Spiral bands
+  color += BLUE * spiralBand * 0.35;
+
+  // Radial streaks
+  color += mix(PURPLE, WHITE, 0.3) * streaks;
+
+  // Inner glow
+  color += WHITE * innerGlow * 0.7 * coreFlicker;
+
+  // White-hot center
+  color += WHITE * core * coreFlicker;
+
+  // Tiny hot particles being pulled in
+  float inflowNoise = snoise(vec2(angle * 5.0, mouseDist * 20.0 - t * 5.0));
+  float inflowParticles = smoothstep(0.7, 0.8, inflowNoise) * exp(-mouseDist * 3.0);
+  color += WHITE * inflowParticles * 0.2;
+
+  return color;
+}
+
+
+// ═══════════════════════════════════════════════════════════
+// RELEASE: Core shatters — geometric shapes scatter outward
+// ═══════════════════════════════════════════════════════════
+vec3 releaseShatter(vec2 uv, float t, vec2 origin, float anim) {
+  vec2 c = uv - origin;
   float dist = length(c);
 
   vec3 color = VOID;
 
-  // Remnant center glow — faint memory of the forge
-  color += DEEP_PURP * exp(-dist * dist * 6.0) * 0.12;
+  // Fading remnant glow at release point
+  float remnant = exp(-dist * dist * 20.0) * (1.0 - anim) * 0.5;
+  color += mix(FORGE_HOT, PURPLE, anim) * remnant;
+
+  // Expanding shockwave ring
+  float ringRadius = anim * 0.6;
+  float ring = 1.0 - smoothstep(0.0, 0.015, abs(dist - ringRadius));
+  ring *= (1.0 - anim * 0.8); // Fades as it expands
+  color += WHITE * ring * 0.3;
 
   // Scattered geometric fragments
-  // Each fragment: position, size, rotation, polygon sides, drift speed
-  for (int i = 0; i < 12; i++) {
+  for (int i = 0; i < 10; i++) {
     float fi = float(i);
+    float angle = fi * 0.628 + hash(vec2(fi, 7.0)) * 1.5;
+    float speed = 0.2 + hash(vec2(fi, 8.0)) * 0.4;
 
-    // Pseudo-random placement in a ring/scatter pattern
-    float angle = fi * 0.52 + hash(vec2(fi, 0.0)) * 2.0;
-    float radius = 0.15 + hash(vec2(fi, 1.0)) * 0.3;
+    // Fragments fly outward from release origin
+    float fragRadius = anim * speed;
+    vec2 fragPos = origin + vec2(cos(angle), sin(angle)) * fragRadius;
 
-    // Slow outward drift
-    float drift = t * (0.005 + hash(vec2(fi, 2.0)) * 0.008);
-    radius += drift;
+    vec2 local = uv - fragPos;
 
-    // Wrap radius to keep fragments on screen
-    radius = mod(radius, 0.55);
-
-    vec2 center = vec2(cos(angle), sin(angle)) * radius;
-
-    // Slow rotation per fragment
-    float rot = t * (0.1 + hash(vec2(fi, 3.0)) * 0.2);
-
-    vec2 local = c - center;
-    // Rotate
+    // Rotation
+    float rot = t * 0.3 + fi * 0.5 + anim * 3.0;
     float cs = cos(rot), sn = sin(rot);
     local = vec2(local.x * cs - local.y * sn, local.x * sn + local.y * cs);
 
-    // Fragment size — small
-    float size = 0.015 + hash(vec2(fi, 4.0)) * 0.025;
+    float size = 0.012 + hash(vec2(fi, 9.0)) * 0.018;
+    // Scale down as they fly — shrink with distance
+    size *= 1.0 - anim * 0.5;
 
-    // Polygon type: 3 (triangle), 4 (square), 5 (pentagon), 6 (hexagon)
-    float sides = 3.0 + floor(hash(vec2(fi, 5.0)) * 4.0);
-
+    float sides = 3.0 + floor(hash(vec2(fi, 10.0)) * 4.0);
     float d = sdPolygon(local, size, sides);
 
-    // Hard edge
-    float shape = 1.0 - smoothstep(-0.002, 0.002, d);
+    float shape = 1.0 - smoothstep(-0.001, 0.001, d);
+    float edge = 1.0 - smoothstep(0.0, 0.006, abs(d));
 
-    // Edge outline glow
-    float edge = 1.0 - smoothstep(0.0, 0.008, abs(d));
+    // Fade out over animation duration
+    float fragAlpha = 1.0 - anim * 0.7;
 
-    // Color varies per fragment
-    vec3 fragColor = mix(BLUE, PURPLE, hash(vec2(fi, 6.0)));
-
-    // Subtle inner fill
-    color += fragColor * shape * 0.12;
-
-    // Brighter edge wireframe
-    color += mix(BLUE, WHITE, 0.3) * edge * 0.2;
+    vec3 fragColor = mix(BLUE, PURPLE, hash(vec2(fi, 11.0)));
+    color += fragColor * shape * 0.15 * fragAlpha;
+    color += mix(BLUE, WHITE, 0.4) * edge * 0.25 * fragAlpha;
   }
 
   return color;
@@ -311,38 +269,47 @@ vec3 theAwakening(vec2 uv, float t) {
 
 
 // ═══════════════════════════════════════════════════════════
-// Main — smooth cross-fade between states
+// Main — blend states based on interaction uniforms
 // ═══════════════════════════════════════════════════════════
 void main() {
-  // Aspect-correct UV
   float aspect = uResolution.x / uResolution.y;
   vec2 uv = vUv;
   uv.x *= aspect;
   uv.x -= (aspect - 1.0) * 0.5;
 
+  // Aspect-correct mouse position
+  vec2 mouse = uMouse;
+  mouse.x *= aspect;
+  mouse.x -= (aspect - 1.0) * 0.5;
+
   float t = uTime;
-  float p = clamp(uProgress, 0.0, 1.0);
 
-  // State blending with overlap zones
-  float s1 = 1.0 - smoothstep(0.20, 0.38, p);
-  float s2 = smoothstep(0.20, 0.38, p) * (1.0 - smoothstep(0.50, 0.68, p));
-  float s3 = smoothstep(0.50, 0.68, p) * (1.0 - smoothstep(0.80, 0.95, p));
-  float s4 = smoothstep(0.80, 0.95, p);
-
+  // ── Layer the interaction states ──
   vec3 color = vec3(0.0);
-  color += quantumJitter(uv, t) * s1;
-  color += transverseWaves(uv, t) * s2;
-  color += theForge(uv, t) * s3;
-  color += theAwakening(uv, t) * s4;
 
-  // Heavy radial vignette — edges forced to pure #000000
-  float vignetteDist = length(vUv - 0.5) * 1.4;
-  float vignette = 1.0 - pow(vignetteDist, 1.8);
-  vignette = clamp(vignette, 0.0, 1.0);
-  color *= vignette;
+  // Base: always-present idle jitter (fades down during press)
+  float idleAmount = 1.0 - uPressStrength * 0.7;
+  color += idleJitter(uv, t) * idleAmount;
 
-  // Ensure deep blacks at edges
+  // Hover: magnetic alignment near cursor
+  color += hoverField(uv, t, mouse) * uHoverStrength * (1.0 - uPressStrength);
+
+  // Press: gravity collapse at cursor
+  color += pressGravity(uv, t, mouse) * uPressStrength;
+
+  // Release: shatter animation (overlays everything)
+  if (uReleaseAnim > 0.01) {
+    vec2 releasePos = uReleaseOrigin;
+    releasePos.x *= aspect;
+    releasePos.x -= (aspect - 1.0) * 0.5;
+    color += releaseShatter(uv, t, releasePos, uReleaseAnim);
+  }
+
+  // ── Heavy radial vignette — edges pure black ──
+  float vDist = length(vUv - 0.5) * 1.4;
+  float vignette = 1.0 - pow(vDist, 1.8);
+  color *= clamp(vignette, 0.0, 1.0);
+
   color = max(color, vec3(0.0));
-
   gl_FragColor = vec4(color, 1.0);
 }
