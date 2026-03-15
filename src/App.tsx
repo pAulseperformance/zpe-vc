@@ -6,6 +6,7 @@ import { TerminalIntake } from '@/widgets/terminal-intake'
 import { DevModeButton } from '@/widgets/dev-mode-button/DevModeButton'
 import { useSynth, yToFreq } from '@/features/quantum-audio'
 import type { SynthWaveform, ScaleName } from '@/features/quantum-audio'
+import { useHandTracker } from '@/features/hand-tracking'
 
 const IS_DEV = import.meta.env.DEV
 
@@ -24,6 +25,11 @@ export default function App() {
   const audio = useSynth()
   const gravBodyPositionsRef = useRef<{click: {x: number, y: number}, mouse: {x: number, y: number}} | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+
+  // Hand tracking
+  const hand = useHandTracker()
+  const handNoteRef = useRef<{ release: () => void } | null>(null)
+  const wasPinchingRef = useRef(false)
 
   // Synth controls
   const [synthWaveform, setSynthWaveform] = useState<SynthWaveform>('sine')
@@ -144,8 +150,32 @@ export default function App() {
       lastUpdateRef.current = now
       setEnergyDisplay(energy)
     }
-    // Update synth per frame — mouseX=filter cutoff + panning, mouseY=pitch
-    audio.update(energy, tuning.ripThreshold, interferenceRatio, mouseX, mouseY)
+    // Update synth per frame — use hand position if active, else mouse
+    const handS = hand.stateRef.current
+    const useHand = hand.active && handS.detected
+    const synthX = useHand ? handS.x : mouseX
+    const synthY = useHand ? handS.y : mouseY
+    audio.update(energy, tuning.ripThreshold, interferenceRatio, synthX, synthY)
+
+    // Hand pinch → note trigger (sustained while pinching)
+    if (useHand && audioEnabled) {
+      if (handS.pinching && !wasPinchingRef.current) {
+        // Pinch start → play sustained note
+        handNoteRef.current?.release()
+        const freq = yToFreq(handS.y, synthScale)
+        handNoteRef.current = audio.playNote(freq, 0.8, true)
+        // Spawn visual wave at hand position
+        simClickQueueRef.current.push({ x: handS.x, y: handS.y })
+      } else if (!handS.pinching && wasPinchingRef.current) {
+        // Pinch end → release note
+        handNoteRef.current?.release()
+        handNoteRef.current = null
+      } else if (handS.pinching && handNoteRef.current) {
+        // While pinching, continuously update pitch based on hand Y
+        // (this creates a pitch-bend effect as you move your hand)
+      }
+      wasPinchingRef.current = handS.pinching
+    }
 
     // FFT → Wave Spawning: bass hits auto-spawn waves
     if (fftSpawnEnabled && audioEnabled) {
@@ -283,6 +313,7 @@ export default function App() {
           envRelease={envRelease}
           onEnvRelease={(v) => { setEnvRelease(v); audio.setEnvelope(envAttack, envDecay, envSustain, v) }}
           fftRef={audio.fftRef}
+          handTracking={hand}
         />
       )}
     </div>

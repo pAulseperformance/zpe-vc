@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { MutableRefObject } from 'react'
+import type { HandTarget } from '@/features/hand-tracking'
 import { useAutoSim } from '../lib/use-auto-sim'
 import { MOUSE_SLIDERS, OBJECT_SLIDERS, UNIVERSE_SLIDERS, DEFAULT_TUNING } from '../lib/shader-tuning'
 import type { ShaderTuning } from '../lib/shader-tuning'
@@ -67,9 +68,20 @@ interface DevPanelProps {
   envSustain: number; onEnvSustain: (v: number) => void
   envRelease: number; onEnvRelease: (v: number) => void
   fftRef: MutableRefObject<FFTBands>
+  // Hand tracking
+  handTracking: {
+    active: boolean
+    loading: boolean
+    toggle: () => void
+    handState: { x: number; y: number; z: number; pinching: boolean; confidence: number; detected: boolean }
+    setMapping: (axis: 'x' | 'y' | 'z', target: HandTarget) => void
+    setSmoothing: (v: number) => void
+    setPinchThreshold: (v: number) => void
+    getConfig: () => { xTarget: HandTarget; yTarget: HandTarget; zTarget: HandTarget; pinchThreshold: number; smoothing: number }
+  }
 }
 
-export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, masterVolume, onMasterVolume, droneVolume, onDroneVolume, notesVolume, onNotesVolume, hideCursor, onCursorHideChange, gravBodyPositions, canvasRef, synthWaveform, onSynthWaveform, synthFilterQ, onSynthFilterQ, audioReactive, onAudioReactive, synthScale, onSynthScale, unisonCount, onUnisonCount, detuneSpread, onDetuneSpread, delayTime, onDelayTime, delayFeedback, onDelayFeedback, delayMix, onDelayMix, reverbMix, onReverbMix, reverbDecay, onReverbDecay, distortion, onDistortion, autoDistortion, onAutoDistortion, fftSpawnEnabled, onFftSpawnEnabled, fftSpawnThreshold, onFftSpawnThreshold, fftSpawnRate, onFftSpawnRate, envAttack, onEnvAttack, envDecay, onEnvDecay, envSustain, onEnvSustain, envRelease, onEnvRelease, fftRef }: DevPanelProps) {
+export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, masterVolume, onMasterVolume, droneVolume, onDroneVolume, notesVolume, onNotesVolume, hideCursor, onCursorHideChange, gravBodyPositions, canvasRef, synthWaveform, onSynthWaveform, synthFilterQ, onSynthFilterQ, audioReactive, onAudioReactive, synthScale, onSynthScale, unisonCount, onUnisonCount, detuneSpread, onDetuneSpread, delayTime, onDelayTime, delayFeedback, onDelayFeedback, delayMix, onDelayMix, reverbMix, onReverbMix, reverbDecay, onReverbDecay, distortion, onDistortion, autoDistortion, onAutoDistortion, fftSpawnEnabled, onFftSpawnEnabled, fftSpawnThreshold, onFftSpawnThreshold, fftSpawnRate, onFftSpawnRate, envAttack, onEnvAttack, envDecay, onEnvDecay, envSustain, onEnvSustain, envRelease, onEnvRelease, fftRef, handTracking }: DevPanelProps) {
   const [collapsed, setCollapsed] = useState(false)
   const sim = useAutoSim({ onSimClick, onSimMouseActiveChange, onSimMouseUpdate, zoomMode: tuning.zoomMode })
 
@@ -226,6 +238,77 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
         />
         </>
       )}
+
+      {/* Hand Tracking Controls */}
+      <div className="mt-3 pt-3 border-t border-cold-white-dim/10">
+        <div className="flex items-center justify-between">
+          <span className="text-[0.6rem] text-electric-purple/60 tracking-wider uppercase">🖐 Hand Tracking</span>
+          <button
+            onClick={handTracking.toggle}
+            disabled={handTracking.loading}
+            className={`text-[0.55rem] px-2 py-0.5 rounded border transition-colors ${
+              handTracking.loading
+                ? 'border-yellow-400/30 text-yellow-400 animate-pulse'
+                : handTracking.active
+                  ? 'border-green-400/40 bg-green-400/10 text-green-400'
+                  : 'border-cold-white-dim/20 text-cold-white-dim/50 hover:border-electric-purple/30'
+            }`}
+          >
+            {handTracking.loading ? '⏳ Loading...' : handTracking.active ? '🟢 Active' : '📷 Enable'}
+          </button>
+        </div>
+
+        {handTracking.active && (() => {
+          const cfg = handTracking.getConfig()
+          const hs = handTracking.handState
+          const TARGETS: HandTarget[] = ['pitch', 'filter', 'volume', 'delayMix', 'reverbMix', 'none']
+          const TARGET_LABELS: Record<HandTarget, string> = {
+            pitch: '🎵 Pitch', filter: '🔊 Filter', volume: '📢 Volume',
+            delayMix: '⏱ Delay', reverbMix: '🏔 Reverb', none: '— None',
+          }
+          return (
+            <div className="mt-2 space-y-1.5">
+              {/* Live status */}
+              <div className="flex items-center gap-2 text-[0.5rem] text-cold-white-dim/40">
+                <span>Confidence: <span className={hs.detected ? 'text-green-400' : 'text-red-400'}>{(hs.confidence * 100).toFixed(0)}%</span></span>
+                <span>{hs.pinching ? '🤏 Pinching' : '✋ Open'}</span>
+              </div>
+
+              {/* Axis mapping selectors */}
+              {(['x', 'y', 'z'] as const).map((axis) => (
+                <div key={axis} className="flex items-center gap-2">
+                  <span className="text-[0.55rem] text-cold-white-dim/40 w-8 uppercase">{axis}-Axis</span>
+                  <select
+                    value={cfg[`${axis}Target`]}
+                    onChange={e => handTracking.setMapping(axis, e.target.value as HandTarget)}
+                    className="flex-1 bg-black/60 border border-cold-white-dim/15 rounded text-[0.55rem] text-cold-white-dim px-1 py-0.5"
+                  >
+                    {TARGETS.map(t => <option key={t} value={t}>{TARGET_LABELS[t]}</option>)}
+                  </select>
+                </div>
+              ))}
+
+              {/* Smoothing */}
+              <div className="flex items-center gap-2">
+                <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Smooth</span>
+                <input type="range" min={0} max={0.95} step={0.05} value={cfg.smoothing}
+                  onChange={e => handTracking.setSmoothing(Number(e.target.value))}
+                  className="flex-1 h-1 accent-electric-purple" />
+                <span className="text-[0.55rem] w-8 text-right">{(cfg.smoothing * 100).toFixed(0)}%</span>
+              </div>
+
+              {/* Pinch threshold */}
+              <div className="flex items-center gap-2">
+                <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Pinch</span>
+                <input type="range" min={0.02} max={0.15} step={0.005} value={cfg.pinchThreshold}
+                  onChange={e => handTracking.setPinchThreshold(Number(e.target.value))}
+                  className="flex-1 h-1 accent-electric-purple" />
+                <span className="text-[0.55rem] w-8 text-right">{(cfg.pinchThreshold * 100).toFixed(0)}</span>
+              </div>
+            </div>
+          )
+        })()}
+      </div>
 
       <EnergyMeter
         energy={energy}

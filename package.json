@@ -11,6 +11,7 @@
     "deploy": "npm run build && npx wrangler deploy"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "^0.10.32",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
     "@react-three/postprocessing": "^3.0.4",
