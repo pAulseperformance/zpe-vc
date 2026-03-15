@@ -22,6 +22,7 @@ export interface ShaderTuning {
   iridescence: number
   paletteMode: number  // 0=physical, 1=artistic, 2=hybrid
   starField: number    // 0=off, 1=full brightness
+  wavelength: number   // 0=radio, 1=infrared, 2=visible, 3=xray, 4=gamma
 }
 
 export const DEFAULT_TUNING: ShaderTuning = {
@@ -46,6 +47,7 @@ export const DEFAULT_TUNING: ShaderTuning = {
   iridescence: 0.5,
   paletteMode: 1,  // Default: artistic
   starField: 0,     // Off by default
+  wavelength: 2,    // Visible light (default)
 }
 
 const STORAGE_KEY = 'zpe-shader-presets'
@@ -306,6 +308,31 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
             title={title}
             className={`text-[0.5rem] px-1.5 py-0.5 rounded border ${
               tuning.paletteMode === mode
+                ? 'text-electric-purple border-electric-purple/40 bg-electric-purple/10'
+                : 'text-cold-white-dim/30 border-cold-white-dim/10 hover:border-electric-purple/20'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Wavelength band selector */}
+      <div className="flex items-center gap-1 mb-2 flex-wrap">
+        <span className="text-[0.55rem] text-cold-white-dim/40 w-14 shrink-0">Band</span>
+        {([
+          { mode: 0, label: '📻', title: 'Radio — long wavelength, low energy' },
+          { mode: 1, label: '🔴', title: 'Infrared — thermal emission' },
+          { mode: 2, label: '👁', title: 'Visible — default human perception' },
+          { mode: 3, label: '💎', title: 'X-Ray — high energy penetration' },
+          { mode: 4, label: '☢️', title: 'Gamma — extreme energy, pair production' },
+        ] as const).map(({ mode, label, title }) => (
+          <button
+            key={mode}
+            onClick={() => onChange({ ...tuning, wavelength: mode })}
+            title={title}
+            className={`text-[0.6rem] px-1 py-0.5 rounded border ${
+              tuning.wavelength === mode
                 ? 'text-electric-purple border-electric-purple/40 bg-electric-purple/10'
                 : 'text-cold-white-dim/30 border-cold-white-dim/10 hover:border-electric-purple/20'
             }`}

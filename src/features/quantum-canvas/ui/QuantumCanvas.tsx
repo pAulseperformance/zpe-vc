@@ -72,6 +72,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
       uIridescence: { value: tuning.iridescence ?? 0.5 },
       uPaletteMode: { value: tuning.paletteMode ?? 1 },
       uStarField: { value: tuning.starField ?? 0 },
+      uWavelength: { value: tuning.wavelength ?? 2 },
       uMouseVelocity: { value: new THREE.Vector2(0, 0) },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -214,6 +215,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
     mat.uniforms.uIridescence.value = t.iridescence ?? 0.5
     mat.uniforms.uPaletteMode.value = t.paletteMode ?? 1
     mat.uniforms.uStarField.value = t.starField ?? 0
+    mat.uniforms.uWavelength.value = t.wavelength ?? 2
     mat.uniforms.uMouseVelocity.value.copy(velocityVec)
   })
 

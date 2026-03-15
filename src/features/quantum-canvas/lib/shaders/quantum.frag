@@ -38,6 +38,7 @@ uniform float uHeatField;
 uniform float uIridescence;
 uniform float uPaletteMode; // 0 = physical, 1 = artistic, 2 = hybrid
 uniform float uStarField;   // 0 = off, 1 = full brightness
+uniform float uWavelength;  // 0=radio, 1=infrared, 2=visible, 3=xray, 4=gamma
 
 // ─── Palette ───
 const vec3 BLACK     = vec3(0.0);
@@ -93,6 +94,33 @@ vec3 planckBlackbody(float temp) {
   // Blue-white (0.8 - 1.0)
   col = mix(col, vec3(0.85, 0.90, 1.0), smoothstep(0.8, 1.0, t));
   return col;
+}
+
+// Multi-wavelength color remapping
+// Simulates observing the same physics at different EM bands
+vec3 wavelengthRemap(vec3 color, float intensity) {
+  if (uWavelength < 0.5) {
+    // Radio: warm red tones, large-scale diffuse emission
+    float lum = dot(color, vec3(0.299, 0.587, 0.114));
+    return vec3(lum * 1.2, lum * 0.3, lum * 0.05) * 1.5;
+  } else if (uWavelength < 1.5) {
+    // Infrared: orange-amber thermal view
+    float lum = dot(color, vec3(0.299, 0.587, 0.114));
+    return vec3(lum * 1.0, lum * 0.55, lum * 0.1) * 1.3;
+  } else if (uWavelength < 2.5) {
+    // Visible: pass through (default human perception)
+    return color;
+  } else if (uWavelength < 3.5) {
+    // X-Ray: blue-white, high contrast, emphasizes dense regions
+    float lum = dot(color, vec3(0.299, 0.587, 0.114));
+    float boosted = pow(lum, 0.6); // boost faint details
+    return vec3(boosted * 0.5, boosted * 0.7, boosted * 1.2);
+  } else {
+    // Gamma: violet/magenta, extreme energy events only
+    float lum = dot(color, vec3(0.299, 0.587, 0.114));
+    float boosted = pow(lum, 0.4); // strong boost for faint signals
+    return vec3(boosted * 0.9, boosted * 0.2, boosted * 1.0) * 1.4;
+  }
 }
 
 // ─── Simplex Noise ───
@@ -491,6 +519,10 @@ void main() {
   // Star color temperature: warm white to blue-white
   vec3 starColor = mix(vec3(1.0, 0.95, 0.85), vec3(0.85, 0.92, 1.0), starHash2);
   color += starColor * starBright * 0.15 * uStarField;
+
+  // ── Multi-wavelength rendering ──
+  float totalLum = dot(color, vec3(0.299, 0.587, 0.114));
+  color = wavelengthRemap(color, totalLum);
 
   float vDist = length(vUv - 0.5) * 1.6;
   float vignette = 1.0 - pow(vDist, 1.5);
