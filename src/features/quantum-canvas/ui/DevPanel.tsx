@@ -106,7 +106,7 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
   }
 
   return (
-    <div className="fixed top-3 right-3 z-50 w-72 max-h-[85vh] flex flex-col bg-black/90 border border-electric-purple/30 rounded-lg p-3 font-mono text-xs text-cold-white-dim backdrop-blur-sm">
+    <div className="fixed top-3 right-3 z-50 w-72 max-h-[85vh] overflow-y-auto flex flex-col bg-black/90 border border-electric-purple/30 rounded-lg p-3 font-mono text-xs text-cold-white-dim backdrop-blur-sm scrollbar-thin scrollbar-track-transparent scrollbar-thumb-electric-purple/20 hover:scrollbar-thumb-electric-purple/40" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(168,85,247,0.2) transparent' }}>
       <PanelHeader
         audioEnabled={audioEnabled}
         onAudioToggle={onAudioToggle}
