@@ -67,6 +67,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
       uWaveLifetime: { value: tuning.waveLifetime },
       uParallaxDepth: { value: tuning.parallaxDepth },
       uHeatDecay: { value: tuning.heatDecay },
+      uHeatAttack: { value: tuning.heatAttack },
       uHeatIntensity: { value: tuning.heatIntensity },
       uInterferenceBlend: { value: tuning.interferenceBlend },
       uHeatField: { value: 0 },
@@ -227,6 +228,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
     mat.uniforms.uWaveLifetime.value = t.waveLifetime
     mat.uniforms.uParallaxDepth.value = t.parallaxDepth
     mat.uniforms.uHeatDecay.value = t.heatDecay
+    mat.uniforms.uHeatAttack.value = t.heatAttack
     mat.uniforms.uHeatIntensity.value = t.heatIntensity
     mat.uniforms.uInterferenceBlend.value = t.interferenceBlend
     mat.uniforms.uHeatField.value = heatFieldRef.current

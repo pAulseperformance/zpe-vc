@@ -15,6 +15,7 @@ export interface ShaderTuning {
   ripThreshold: number
   parallaxDepth: number
   heatDecay: number
+  heatAttack: number   // How quickly heat builds behind EM front (ADSR attack)
   heatIntensity: number
   interferenceBlend: number
   iridescence: number
@@ -47,6 +48,7 @@ export const DEFAULT_TUNING: ShaderTuning = {
   ripThreshold: 200,
   parallaxDepth: 0.15,
   heatDecay: 0.2,
+  heatAttack: 0.5,
   heatIntensity: 1,
   interferenceBlend: 1,
   iridescence: 0.5,
@@ -85,7 +87,8 @@ export const SLIDERS: SliderDef[] = [
   { key: 'clickSpike', label: 'Click Spike', min: 5, max: 50, step: 5 },
   { key: 'ripThreshold', label: 'Rip Threshold', min: 30, max: 200, step: 10 },
   { key: 'parallaxDepth', label: 'Parallax', min: 0.0, max: 0.15, step: 0.005 },
-  { key: 'heatDecay', label: 'Heat Decay', min: 0.2, max: 5.0, step: 0.1 },
+  { key: 'heatDecay', label: 'Heat Decay', min: 0.05, max: 2.0, step: 0.05 },
+  { key: 'heatAttack', label: 'Heat Attack', min: 0.0, max: 1.0, step: 0.05 },
   { key: 'heatIntensity', label: 'Heat Intensity', min: 0.0, max: 1.0, step: 0.05 },
   { key: 'interferenceBlend', label: 'Interference', min: 0.0, max: 1.0, step: 0.05 },
   { key: 'iridescence', label: 'Iridescence', min: 0.0, max: 1.0, step: 0.05 },

@@ -32,6 +32,7 @@ uniform float uHoverRadius;
 uniform float uWaveLifetime;
 uniform float uParallaxDepth;
 uniform float uHeatDecay;
+uniform float uHeatAttack;
 uniform float uHeatIntensity;
 uniform float uInterferenceBlend;
 uniform float uHeatField;
@@ -394,20 +395,31 @@ void main() {
     );
     catalystColorAdditive += waveColor * emIntensity * 0.5;
     spectrumAccum += specBase * emIntensity;
-    // ── Heat trail: thermal wake BEHIND the EM wavefront ──
-    // Physics: EM wave sweeps past → energy absorbed → delayed heating
-    float thermalDelay = 0.05; // Heat wake lags behind EM front
+    // ── Heat trail: ADSR envelope (Attack/Decay) behind EM wavefront ──
+    // Attack: how far behind the EM front the heat appears + onset ramp
+    //   Low attack (0): heat follows EM almost instantly (tight wake)
+    //   High attack (1): heat builds slowly, wide gap behind EM front
+    float thermalDelay = 0.02 + uHeatAttack * 0.12; // 0.02–0.14 UV gap
     float thermalFront = waveFront - thermalDelay;
 
-    // Thermal wake has reached this pixel? (full area behind thermal front)
-    float thermalPassed = smoothstep(thermalFront + 0.01, thermalFront - 0.01, rawDist);
+    // Thermal wake gate with attack-shaped onset ramp
+    // High attack = gradual onset (wide smoothstep), low attack = sharp
+    float onsetWidth = 0.005 + uHeatAttack * 0.04;
+    float thermalPassed = smoothstep(thermalFront + onsetWidth, thermalFront - onsetWidth, rawDist);
 
-    // Spatial cooling: hottest near thermal front, cooling further inside
+    // Heat equation: Gaussian diffusion profile
     float distBehindThermal = max(thermalFront - rawDist, 0.0);
-    float thermalGradient = exp(-distBehindThermal * 2.5);
+    float alpha = 0.005 + uHeatAttack * 0.008; // High attack = more spreading
+    float diffusionTime = max(age * 0.5, 0.01);
+    float sigma = sqrt(2.0 * alpha * diffusionTime);
+    float thermalProfile = exp(-(distBehindThermal * distBehindThermal) / (2.0 * sigma * sigma));
+    thermalProfile /= (1.0 + sigma * 15.0);
 
-    // Accumulate: thermal wake gate × spatial gradient × age decay
-    float heatContrib = thermalPassed * thermalGradient * exp(-age * uHeatDecay);
+    // Decay: tail fade — exponential cooling
+    float coolingBase = exp(-age * uHeatDecay);
+    float cooling = coolingBase * coolingBase; // T² for non-linear fade
+
+    float heatContrib = thermalPassed * thermalProfile * cooling;
 
     // Barrier blocks heat
     float heatBarrierFactor = 1.0;
@@ -502,8 +514,8 @@ void main() {
   // ── Quantum dust (depth parallax + heat trail + energy colors) ──
   vec3 color = BLACK;
 
-  // Local energy intensity — drives dust brightness with heat
-  float localHeat = eNorm * hoverInfluence + heatResidual * uHeatIntensity * 2.0 + uHeatField * 0.3;
+  // All heat terms gated by uHeatIntensity — intensity 0 = zero heat visible
+  float localHeat = eNorm * hoverInfluence + (heatResidual * 2.0 + uHeatField * 0.3) * uHeatIntensity;
 
   // Per-layer depth parallax: shifts UV based on cursor offset × depth
   vec2 cursorOffset = uv - mouse;
@@ -514,13 +526,15 @@ void main() {
   float dust1 = snoise(uv1 * 350.0 + t * speed1 * 0.5);
   float sparks1 = smoothstep(0.78, 0.85, dust1) * 0.07 * brightMult;
   // Heated particles glow brighter — luminosity scales with temperature
-  sparks1 *= (1.0 + clamp(localHeat, 0.0, 1.0) * 2.0);
+  float heatBright = clamp(localHeat, 0.0, 1.0);
+  heatBright = heatBright * heatBright; // Squared: low residual → invisible, high heat → glow
+  sparks1 *= (1.0 + heatBright * 2.0);
   // Dust color depends on palette mode
   vec3 dust1Color;
   vec3 heatColor;
   // Color mapping — uses 1× multiplier so full spectrum is visible
   // (heatResidual 0.1=ember, 0.3=cherry, 0.5=orange, 0.7=yellow, 0.9=white)
-  float heatTintRaw = heatResidual * uHeatIntensity + uHeatField * 0.2;
+  float heatTintRaw = (heatResidual + uHeatField * 0.2) * uHeatIntensity;
   float heatTint = clamp(heatTintRaw, 0.0, 1.0);
   if (uPaletteMode < 0.5) {
     // Physical: Planck blackbody for all thermal emission
@@ -545,12 +559,14 @@ void main() {
   float speed2 = speedMult * 0.8;
   float dust2 = snoise(uv2 * 500.0 + t * speed2 * 0.7 + 100.0);
   float sparks2 = smoothstep(0.82, 0.88, dust2) * 0.035 * brightMult;
+  sparks2 *= (1.0 + heatBright * 2.0);
   vec3 dust2Color;
   if (uPaletteMode < 0.5) {
     dust2Color = mix(vec3(0.15, 0.05, 0.08) * 0.6, planckBlackbody(localHeat * 0.5 + 0.2), localHeat);
   } else {
     dust2Color = mix(VIOLET * 0.6, energySpectrum(localHeat * 0.5 + 0.2), localHeat);
   }
+  dust2Color = mix(dust2Color, heatColor, clamp(heatTintRaw * 0.8, 0.0, 0.9));
   color += dust2Color * sparks2;
 
   // Layer 3: dense field — NEAR-MID (depth 0.7)
@@ -558,12 +574,14 @@ void main() {
   float speed3 = speedMult * 0.9;
   float dust3 = snoise(uv3 * 600.0 - t * speed3 * 0.3 + 50.0);
   float sparks3 = smoothstep(0.84, 0.90, dust3) * 0.025 * brightMult;
+  sparks3 *= (1.0 + heatBright * 2.0);
   vec3 dust3Color;
   if (uPaletteMode < 0.5) {
     dust3Color = mix(vec3(0.08, 0.02, 0.05) * 0.5, planckBlackbody(localHeat * 0.6 + 0.35), localHeat);
   } else {
     dust3Color = mix(INDIGO * 0.5, energySpectrum(localHeat * 0.6 + 0.35), localHeat);
   }
+  dust3Color = mix(dust3Color, heatColor, clamp(heatTintRaw * 0.7, 0.0, 0.85));
   color += dust3Color * sparks3;
 
   // Layer 4: bright pops — NEAR (depth 1.0)
@@ -572,30 +590,16 @@ void main() {
   float popThreshold = mix(0.90, 0.75, localHeat);
   float pop = snoise(uv4 * 250.0 + t * speed4 * 2.2);
   float brightPop = smoothstep(popThreshold, popThreshold + 0.04, pop) * 0.18 * brightMult;
-  vec3 popColor = mix(COLD_WHT, energySpectrum(localHeat * 0.9 + 0.4), localHeat);
+  brightPop *= (1.0 + clamp(localHeat, 0.0, 1.0) * 1.5);
+  vec3 popColor;
+  if (uPaletteMode < 0.5) {
+    popColor = mix(COLD_WHT, planckBlackbody(localHeat * 0.9 + 0.4), localHeat);
+  } else {
+    popColor = mix(COLD_WHT, energySpectrum(localHeat * 0.9 + 0.4), localHeat);
+  }
   color += popColor * brightPop;
 
-  // ══════════════════════════════════════════
-  // THERMAL GLOW — continuous heat wake behind EM front
-  // ══════════════════════════════════════════
-  // Unlike sparse dust particles, this is a broad diffuse glow filling
-  // the entire wave-swept area. Creates the visible thermal wake.
-  float thermalGlow = heatResidual * uHeatIntensity;
-  if (thermalGlow > 0.01) {
-    // Wien's spectrum color based on local temperature
-    vec3 glowColor;
-    if (uPaletteMode < 0.5) {
-      glowColor = planckBlackbody(heatTint);
-    } else if (uPaletteMode < 1.5) {
-      glowColor = heatTrailSpectrum(heatTint);
-    } else {
-      glowColor = planckBlackbody(heatTint);
-    }
-    // Diffuse glow — visible, continuous, not dependent on particle noise
-    color += glowColor * thermalGlow * 0.2;
-  }
 
-  // ══════════════════════════════════════════
   // LIVING CURSOR AURA — pattern-undetectable
   // Uses irrational time offsets so cycles never sync
   // ══════════════════════════════════════════
@@ -678,7 +682,7 @@ void main() {
     mouseDist * 25.0 + waveFieldEnvelope * 8.0 + t * 0.3
   );
   vec3 iridColor = energySpectrum(filmThickness);
-  float iriStrength = smoothstep(0.0, 0.2, eNorm + uHeatField * 0.3)
+  float iriStrength = smoothstep(0.0, 0.2, eNorm + uHeatField * uHeatIntensity * 0.3)
                     * (1.0 - smoothstep(0.0, uHoverRadius * 3.0, mouseDist));
   color = mix(color, color * iridColor * 1.6, iriStrength * uIridescence);
 
