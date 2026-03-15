@@ -2,8 +2,11 @@
  * hand-tracker.ts — MediaPipe HandLandmarker wrapper.
  *
  * Supports 2-hand detection with handedness classification.
+ * MediaPipe is dynamically imported to code-split the ~530KB WASM bundle.
  */
-import { HandLandmarker, FilesetResolver } from '@mediapipe/tasks-vision'
+
+// Dynamic import types — actual module loaded lazily in init()
+type HandLandmarkerType = import('@mediapipe/tasks-vision').HandLandmarker
 
 const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task'
 
@@ -17,7 +20,7 @@ export interface FrameResult {
 export type OnFrameCallback = (result: FrameResult) => void
 
 export class HandTracker {
-  private landmarker: HandLandmarker | null = null
+  private landmarker: HandLandmarkerType | null = null
   private video: HTMLVideoElement | null = null
   private stream: MediaStream | null = null
   private rafId = 0
@@ -29,6 +32,9 @@ export class HandTracker {
 
   async init(): Promise<void> {
     if (this.landmarker) return
+
+    // Dynamic import — code-splits MediaPipe into its own chunk
+    const { HandLandmarker, FilesetResolver } = await import('@mediapipe/tasks-vision')
 
     const vision = await FilesetResolver.forVisionTasks(
       'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm',
