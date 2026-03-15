@@ -63,6 +63,10 @@ export interface ShaderTuning {
   reverbDecay?: number  // 0.5-5 seconds
   distortion?: number   // 0-100 drive
   autoDistortion?: boolean
+  // Feedback loop
+  fftSpawnEnabled?: boolean  // Bass hits auto-spawn waves
+  fftSpawnThreshold?: number // Bass level 0-1 to trigger (default 0.5)
+  fftSpawnRate?: number      // Min ms between spawns (default 150)
   // UI
   hideCursor?: boolean
 }
@@ -121,6 +125,9 @@ export const DEFAULT_TUNING: ShaderTuning = {
   reverbDecay: 2,
   distortion: 0,
   autoDistortion: false,
+  fftSpawnEnabled: false,
+  fftSpawnThreshold: 0.5,
+  fftSpawnRate: 150,
   // UI defaults
   hideCursor: true,
 }

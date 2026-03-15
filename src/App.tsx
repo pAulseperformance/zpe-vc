@@ -4,7 +4,7 @@ const QuantumCanvas = lazy(() => import('@/features/quantum-canvas/ui/QuantumCan
 import { DevPanel, usePersistedTuning } from '@/features/quantum-canvas/ui/DevPanel'
 import { TerminalIntake } from '@/widgets/terminal-intake'
 import { DevModeButton } from '@/widgets/dev-mode-button/DevModeButton'
-import { useSynth } from '@/features/quantum-audio'
+import { useSynth, yToFreq } from '@/features/quantum-audio'
 import type { SynthWaveform, ScaleName } from '@/features/quantum-audio'
 
 const IS_DEV = import.meta.env.DEV
@@ -40,6 +40,11 @@ export default function App() {
   const [reverbDecay, setReverbDecay] = useState(2)
   const [distortion, setDistortion] = useState(0)
   const [autoDistortion, setAutoDistortion] = useState(false)
+  // Feedback loop state
+  const [fftSpawnEnabled, setFftSpawnEnabled] = useState(false)
+  const [fftSpawnThreshold, setFftSpawnThreshold] = useState(0.5)
+  const [fftSpawnRate, setFftSpawnRate] = useState(150)
+  const fftSpawnCooldownRef = useRef(0)
 
   // Dev mode — unlocked after rip boot sequence OR always in dev
   const [devUnlocked, setDevUnlocked] = useState(IS_DEV)
@@ -89,8 +94,11 @@ export default function App() {
 
   const handleSimClick = useCallback((x: number, y: number) => {
     simClickQueueRef.current.push({ x, y })
+    // Play a scale-quantized note based on click Y position
+    const freq = yToFreq(y, synthScale)
+    audio.playNote(freq, 0.6)
     audio.triggerClick(x)
-  }, [audio])
+  }, [audio, synthScale])
 
   const handleSimMouseUpdate = useCallback((x: number, y: number) => {
     simMousePosRef.current = { x, y }
@@ -107,7 +115,21 @@ export default function App() {
     }
     // Update synth per frame — mouseX=filter cutoff + panning, mouseY=pitch
     audio.update(energy, tuning.ripThreshold, interferenceRatio, mouseX, mouseY)
-  }, [audio, tuning.ripThreshold])
+
+    // FFT → Wave Spawning: bass hits auto-spawn waves
+    if (fftSpawnEnabled && audioEnabled) {
+      const bass = audio.fftRef.current.bass
+      if (bass > fftSpawnThreshold && now - fftSpawnCooldownRef.current > fftSpawnRate) {
+        fftSpawnCooldownRef.current = now
+        const spawnX = 0.2 + Math.random() * 0.6
+        const spawnY = 0.2 + Math.random() * 0.6
+        simClickQueueRef.current.push({ x: spawnX, y: spawnY })
+        // Play a quiet note at the spawn position
+        const freq = yToFreq(spawnY, synthScale)
+        audio.playNote(freq, 0.3)
+      }
+    }
+  }, [audio, tuning.ripThreshold, fftSpawnEnabled, fftSpawnThreshold, fftSpawnRate, audioEnabled, synthScale])
 
   const handleZoomChange = useCallback((delta: number) => {
     setTuning(prev => {
@@ -209,6 +231,12 @@ export default function App() {
           onDistortion={(v) => { setDistortion(v); audio.setDistortion(v) }}
           autoDistortion={autoDistortion}
           onAutoDistortion={(v) => { setAutoDistortion(v); audio.setAutoDistortion(v) }}
+          fftSpawnEnabled={fftSpawnEnabled}
+          onFftSpawnEnabled={setFftSpawnEnabled}
+          fftSpawnThreshold={fftSpawnThreshold}
+          onFftSpawnThreshold={setFftSpawnThreshold}
+          fftSpawnRate={fftSpawnRate}
+          onFftSpawnRate={setFftSpawnRate}
           fftRef={audio.fftRef}
         />
       )}

@@ -56,3 +56,12 @@ export function snapToScale(frequency: number, scale: ScaleName): number {
 
   return closest
 }
+
+/** Map a 0-1 Y position to a scale-quantized frequency (C2-C5) */
+export function yToFreq(y: number, scale: ScaleName): number {
+  const MIN = 65    // C2
+  const MAX = 523   // C5
+  const yInv = 1.0 - Math.max(0, Math.min(1, y))
+  const rawFreq = MIN * Math.pow(MAX / MIN, yInv)
+  return snapToScale(rawFreq, scale)
+}

@@ -55,10 +55,14 @@ interface DevPanelProps {
   reverbDecay: number; onReverbDecay: (v: number) => void
   distortion: number; onDistortion: (v: number) => void
   autoDistortion: boolean; onAutoDistortion: (v: boolean) => void
+  // Feedback loop
+  fftSpawnEnabled: boolean; onFftSpawnEnabled: (v: boolean) => void
+  fftSpawnThreshold: number; onFftSpawnThreshold: (v: number) => void
+  fftSpawnRate: number; onFftSpawnRate: (v: number) => void
   fftRef: MutableRefObject<FFTBands>
 }
 
-export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, hideCursor, onCursorHideChange, gravBodyPositions, canvasRef, synthWaveform, onSynthWaveform, synthFilterQ, onSynthFilterQ, audioReactive, onAudioReactive, synthScale, onSynthScale, unisonCount, onUnisonCount, detuneSpread, onDetuneSpread, delayTime, onDelayTime, delayFeedback, onDelayFeedback, delayMix, onDelayMix, reverbMix, onReverbMix, reverbDecay, onReverbDecay, distortion, onDistortion, autoDistortion, onAutoDistortion, fftRef }: DevPanelProps) {
+export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, hideCursor, onCursorHideChange, gravBodyPositions, canvasRef, synthWaveform, onSynthWaveform, synthFilterQ, onSynthFilterQ, audioReactive, onAudioReactive, synthScale, onSynthScale, unisonCount, onUnisonCount, detuneSpread, onDetuneSpread, delayTime, onDelayTime, delayFeedback, onDelayFeedback, delayMix, onDelayMix, reverbMix, onReverbMix, reverbDecay, onReverbDecay, distortion, onDistortion, autoDistortion, onAutoDistortion, fftSpawnEnabled, onFftSpawnEnabled, fftSpawnThreshold, onFftSpawnThreshold, fftSpawnRate, onFftSpawnRate, fftRef }: DevPanelProps) {
   const [collapsed, setCollapsed] = useState(false)
   const sim = useAutoSim({ onSimClick, onSimMouseActiveChange, onSimMouseUpdate, zoomMode: tuning.zoomMode })
 
@@ -115,6 +119,7 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
             delayTime, delayFeedback, delayMix,
             reverbMix, reverbDecay,
             distortion, autoDistortion,
+            fftSpawnEnabled, fftSpawnThreshold, fftSpawnRate,
             hideCursor,
           }
           navigator.clipboard.writeText(JSON.stringify(fullState, null, 2))
@@ -155,6 +160,41 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           distortion={distortion} onDistortionChange={onDistortion}
           autoDistortion={autoDistortion} onAutoDistortionChange={onAutoDistortion}
         />
+        {/* Feedback Loop */}
+        <div className="mt-3 pt-3 border-t border-cold-white-dim/10">
+          <span className="text-[0.6rem] text-electric-purple/60 tracking-wider uppercase">Feedback</span>
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Bass→Wave</span>
+            <button
+              onClick={() => onFftSpawnEnabled(!fftSpawnEnabled)}
+              className={`text-[0.55rem] px-2 py-0.5 rounded border transition-colors ${
+                fftSpawnEnabled
+                  ? 'text-electric-purple border-electric-purple/40 bg-electric-purple/10'
+                  : 'text-cold-white-dim/40 border-cold-white-dim/10'
+              }`}
+            >
+              {fftSpawnEnabled ? '⚡ ON' : '⏸ OFF'}
+            </button>
+          </div>
+          {fftSpawnEnabled && (
+            <>
+              <div className="flex items-center gap-2 mt-1.5">
+                <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Thresh</span>
+                <input type="range" min={0.1} max={0.9} step={0.05} value={fftSpawnThreshold}
+                  onChange={e => onFftSpawnThreshold(Number(e.target.value))}
+                  className="flex-1 h-1 accent-electric-purple" />
+                <span className="text-[0.55rem] w-8 text-right">{(fftSpawnThreshold * 100).toFixed(0)}%</span>
+              </div>
+              <div className="flex items-center gap-2 mt-1.5">
+                <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Rate</span>
+                <input type="range" min={50} max={500} step={25} value={fftSpawnRate}
+                  onChange={e => onFftSpawnRate(Number(e.target.value))}
+                  className="flex-1 h-1 accent-electric-purple" />
+                <span className="text-[0.55rem] w-10 text-right">{fftSpawnRate}ms</span>
+              </div>
+            </>
+          )}
+        </div>
         </>
       )}
 
@@ -281,6 +321,9 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           if (loadedTuning.reverbDecay !== undefined) onReverbDecay(loadedTuning.reverbDecay)
           if (loadedTuning.distortion !== undefined) onDistortion(loadedTuning.distortion)
           if (loadedTuning.autoDistortion !== undefined) onAutoDistortion(loadedTuning.autoDistortion)
+          if (loadedTuning.fftSpawnEnabled !== undefined) onFftSpawnEnabled(loadedTuning.fftSpawnEnabled)
+          if (loadedTuning.fftSpawnThreshold !== undefined) onFftSpawnThreshold(loadedTuning.fftSpawnThreshold)
+          if (loadedTuning.fftSpawnRate !== undefined) onFftSpawnRate(loadedTuning.fftSpawnRate)
           if (loadedTuning.hideCursor !== undefined) onCursorHideChange(loadedTuning.hideCursor)
         }}
         canvasRef={canvasRef}
