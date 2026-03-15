@@ -2,12 +2,12 @@
  * useHandTracker — React hook for dual-hand camera tracking.
  *
  * Manages HandTracker lifecycle, dual GestureMapper output,
- * and provides camera preview element.
+ * per-hand independent mapping configs, and camera preview.
  */
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { HandTracker } from '../lib/hand-tracker'
 import { GestureMapper, EMPTY_STATE, EMPTY_DUAL } from '../lib/gesture-map'
-import type { HandState, DualHandState, HandMappingConfig, HandTarget, Gesture } from '../lib/gesture-map'
+import type { HandState, DualHandState, HandMappingConfig, DualMappingConfig, HandTarget, Gesture } from '../lib/gesture-map'
 
 export function useHandTracker() {
   const trackerRef = useRef<HandTracker | null>(null)
@@ -79,10 +79,16 @@ export function useHandTracker() {
     setLoading(false)
   }, [active, getVideo])
 
-  const setMapping = useCallback((axis: 'x' | 'y' | 'z', target: HandTarget) => {
+  /** Set mapping for a specific hand's axis */
+  const setHandMapping = useCallback((hand: 'left' | 'right', axis: 'x' | 'y' | 'z', target: HandTarget) => {
     const key = `${axis}Target` as keyof HandMappingConfig
-    mapperRef.current.setConfig({ [key]: target })
+    mapperRef.current.setHandConfig(hand, { [key]: target })
   }, [])
+
+  /** Legacy: set mapping for left hand */
+  const setMapping = useCallback((axis: 'x' | 'y' | 'z', target: HandTarget) => {
+    setHandMapping('left', axis, target)
+  }, [setHandMapping])
 
   const setSmoothing = useCallback((v: number) => {
     mapperRef.current.setConfig({ smoothing: v })
@@ -96,13 +102,17 @@ export function useHandTracker() {
     return mapperRef.current.getConfig()
   }, [])
 
+  const getDualConfig = useCallback((): DualMappingConfig => {
+    return mapperRef.current.getDualConfig()
+  }, [])
+
   const getTargetValue = useCallback((target: HandTarget): number | null => {
     return mapperRef.current.getTargetValue(target, stateRef.current)
   }, [])
 
   const getTargetValueForHand = useCallback((target: HandTarget, which: 'left' | 'right'): number | null => {
     const state = which === 'left' ? dualRef.current.left : dualRef.current.right
-    return mapperRef.current.getTargetValue(target, state)
+    return mapperRef.current.getTargetValueForHand(target, which, state)
   }, [])
 
   useEffect(() => {
@@ -119,9 +129,9 @@ export function useHandTracker() {
     active, loading, toggle,
     handState, stateRef,
     dualState, dualRef,
-    setMapping, setSmoothing, setPinchThreshold,
-    getConfig, getTargetValue, getTargetValueForHand,
+    setMapping, setHandMapping, setSmoothing, setPinchThreshold,
+    getConfig, getDualConfig, getTargetValue, getTargetValueForHand,
   }
 }
 
-export type { HandState, DualHandState, HandMappingConfig, HandTarget, Gesture }
+export type { HandState, DualHandState, HandMappingConfig, DualMappingConfig, HandTarget, Gesture }

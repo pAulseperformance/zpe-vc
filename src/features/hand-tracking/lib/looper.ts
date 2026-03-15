@@ -1,8 +1,8 @@
 /**
  * looper.ts — Records and replays hand performance events.
  *
- * Captures timestamped note triggers and parameter changes,
- * then plays them back in a loop.
+ * Supports BPM-quantized recording, multi-layer loops,
+ * and timestamped event capture with wrap-around playback.
  */
 
 export interface LoopEvent {
@@ -14,28 +14,66 @@ export interface LoopEvent {
   y?: number
 }
 
+interface LoopLayer {
+  events: LoopEvent[]
+  muted: boolean
+}
+
 export class Looper {
-  private events: LoopEvent[] = []
+  private layers: LoopLayer[] = []
+  private activeLayer = 0
   private recording = false
   private playing = false
-  private loopLength = 4000  // ms (default 4 seconds)
+  private _bpm = 120
+  private _beats = 4       // beats per loop
+  private _quantize = false // snap events to beat grid
   private startTime = 0
   private playStartTime = 0
   private playRafId = 0
-  private lastPlayIdx = 0
+  private prevElapsed = 0
   private onEvent: (event: LoopEvent) => void = () => {}
 
   get isRecording(): boolean { return this.recording }
   get isPlaying(): boolean { return this.playing }
-  get eventCount(): number { return this.events.length }
-  get length(): number { return this.loopLength }
+  get layerCount(): number { return this.layers.length }
+  get bpm(): number { return this._bpm }
+  get beats(): number { return this._beats }
+  get quantize(): boolean { return this._quantize }
 
-  setLength(ms: number): void {
-    this.loopLength = Math.max(500, Math.min(16000, ms))
+  /** Loop length in ms, derived from BPM and beats */
+  get length(): number {
+    return (60000 / this._bpm) * this._beats
+  }
+
+  get eventCount(): number {
+    return this.layers.reduce((sum, l) => sum + l.events.length, 0)
+  }
+
+  setBpm(bpm: number): void {
+    this._bpm = Math.max(30, Math.min(300, bpm))
+  }
+
+  setBeats(beats: number): void {
+    this._beats = Math.max(1, Math.min(32, beats))
+  }
+
+  setQuantize(on: boolean): void {
+    this._quantize = on
+  }
+
+  /** Quantize a time value to the nearest beat subdivision (16th note) */
+  private quantizeTime(timeMs: number): number {
+    if (!this._quantize) return timeMs
+    const subdivMs = (60000 / this._bpm) / 4 // 16th note
+    return Math.round(timeMs / subdivMs) * subdivMs
   }
 
   startRecording(): void {
-    this.events = []
+    // Add a new layer if the current one has events, or reuse empty
+    if (this.layers.length === 0 || this.layers[this.activeLayer]?.events.length > 0) {
+      this.layers.push({ events: [], muted: false })
+      this.activeLayer = this.layers.length - 1
+    }
     this.recording = true
     this.startTime = performance.now()
   }
@@ -47,19 +85,46 @@ export class Looper {
   /** Record an event (called per-frame while recording) */
   record(event: Omit<LoopEvent, 'time'>): void {
     if (!this.recording) return
-    const time = (performance.now() - this.startTime) % this.loopLength
-    this.events.push({ ...event, time })
+    const rawTime = (performance.now() - this.startTime) % this.length
+    const time = this.quantizeTime(rawTime)
+    const layer = this.layers[this.activeLayer]
+    if (layer) {
+      layer.events.push({ ...event, time })
+    }
+  }
+
+  /** Toggle mute on a specific layer */
+  toggleLayerMute(index: number): void {
+    if (index >= 0 && index < this.layers.length) {
+      this.layers[index].muted = !this.layers[index].muted
+    }
+  }
+
+  /** Delete a specific layer */
+  deleteLayer(index: number): void {
+    if (index >= 0 && index < this.layers.length) {
+      this.layers.splice(index, 1)
+      if (this.activeLayer >= this.layers.length) {
+        this.activeLayer = Math.max(0, this.layers.length - 1)
+      }
+    }
+  }
+
+  /** Get layer info for UI display */
+  getLayerInfo(): Array<{ events: number; muted: boolean }> {
+    return this.layers.map(l => ({ events: l.events.length, muted: l.muted }))
   }
 
   /** Start playback loop. Calls onEvent for each replayed event. */
   startPlayback(onEvent: (event: LoopEvent) => void): void {
-    if (this.events.length === 0) return
+    const totalEvents = this.layers.reduce((s, l) => s + l.events.length, 0)
+    if (totalEvents === 0) return
     this.onEvent = onEvent
     this.playing = true
     this.playStartTime = performance.now()
-    this.lastPlayIdx = 0
-    // Sort events by time for correct playback order
-    this.events.sort((a, b) => a.time - b.time)
+    this.prevElapsed = 0
+    // Sort each layer's events by time
+    this.layers.forEach(l => l.events.sort((a, b) => a.time - b.time))
     this.playLoop()
   }
 
@@ -71,58 +136,37 @@ export class Looper {
 
   clear(): void {
     this.stopPlayback()
-    this.events = []
+    this.layers = []
+    this.activeLayer = 0
   }
 
   private playLoop = (): void => {
     if (!this.playing) return
 
-    const elapsed = (performance.now() - this.playStartTime) % this.loopLength
-    // Find all events that should fire this frame
-    // Handle wrap-around: if lastPlayIdx was near end and we're near start, we wrapped
-    const evts = this.events
-    let idx = this.lastPlayIdx
+    const loopLen = this.length
+    const elapsed = (performance.now() - this.playStartTime) % loopLen
 
-    // Simple approach: scan from last position to current time
-    for (let i = 0; i < evts.length; i++) {
-      const eidx = (idx + i) % evts.length
-      const e = evts[eidx]
-      // Check if this event's time is between last frame and current frame
-      // (accounting for wrap-around)
-      if (this.isEventDue(e.time, elapsed)) {
-        this.onEvent(e)
+    // Fire events from all unmuted layers
+    for (const layer of this.layers) {
+      if (layer.muted) continue
+      for (const e of layer.events) {
+        if (this.isEventDue(e.time, elapsed, loopLen)) {
+          this.onEvent(e)
+        }
       }
     }
 
-    this.lastPlayIdx = this.findClosestIdx(elapsed)
+    this.prevElapsed = elapsed
     this.playRafId = requestAnimationFrame(this.playLoop)
   }
 
-  private prevElapsed = 0
-
-  private isEventDue(eventTime: number, elapsed: number): boolean {
+  private isEventDue(eventTime: number, elapsed: number, _loopLen: number): boolean {
     const prev = this.prevElapsed
-    this.prevElapsed = elapsed
-
     if (elapsed >= prev) {
-      // Normal case: no wrap
       return eventTime >= prev && eventTime < elapsed
     } else {
       // Wrapped around
       return eventTime >= prev || eventTime < elapsed
     }
-  }
-
-  private findClosestIdx(time: number): number {
-    let closest = 0
-    let minDiff = Infinity
-    for (let i = 0; i < this.events.length; i++) {
-      const diff = Math.abs(this.events[i].time - time)
-      if (diff < minDiff) {
-        minDiff = diff
-        closest = i
-      }
-    }
-    return closest
   }
 }

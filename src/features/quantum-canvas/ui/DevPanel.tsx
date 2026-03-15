@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { MutableRefObject } from 'react'
+import { HAND_TARGET_LIST, HAND_TARGET_LABELS } from '@/features/hand-tracking'
 import type { HandTarget } from '@/features/hand-tracking'
 import { useAutoSim } from '../lib/use-auto-sim'
 import { MOUSE_SLIDERS, OBJECT_SLIDERS, UNIVERSE_SLIDERS, DEFAULT_TUNING } from '../lib/shader-tuning'
@@ -79,9 +80,11 @@ interface DevPanelProps {
       right: { detected: boolean; gesture?: string; pinching: boolean; confidence: number }
     }
     setMapping: (axis: 'x' | 'y' | 'z', target: HandTarget) => void
+    setHandMapping: (hand: 'left' | 'right', axis: 'x' | 'y' | 'z', target: HandTarget) => void
     setSmoothing: (v: number) => void
     setPinchThreshold: (v: number) => void
     getConfig: () => { xTarget: HandTarget; yTarget: HandTarget; zTarget: HandTarget; pinchThreshold: number; smoothing: number }
+    getDualConfig: () => { left: { xTarget: HandTarget; yTarget: HandTarget; zTarget: HandTarget }; right: { xTarget: HandTarget; yTarget: HandTarget; zTarget: HandTarget } }
     looper?: {
       recording: boolean
       playing: boolean
@@ -279,13 +282,9 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
         </div>
 
         {handTracking.active && (() => {
+          const dualCfg = handTracking.getDualConfig()
           const cfg = handTracking.getConfig()
           const hs = handTracking.handState
-          const TARGETS: HandTarget[] = ['pitch', 'filter', 'volume', 'delayMix', 'reverbMix', 'none']
-          const TARGET_LABELS: Record<HandTarget, string> = {
-            pitch: '🎵 Pitch', filter: '🔊 Filter', volume: '📢 Volume',
-            delayMix: '⏱ Delay', reverbMix: '🏔 Reverb', none: '— None',
-          }
           return (
             <div className="mt-2 space-y-1.5">
               {/* Live status */}
@@ -296,17 +295,24 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
                 <span className="text-cold-white-dim/20">{(hs.confidence * 100).toFixed(0)}%</span>
               </div>
 
-              {/* Axis mapping selectors */}
-              {(['x', 'y', 'z'] as const).map((axis) => (
-                <div key={axis} className="flex items-center gap-2">
-                  <span className="text-[0.55rem] text-cold-white-dim/40 w-8 uppercase">{axis}-Axis</span>
-                  <select
-                    value={cfg[`${axis}Target`]}
-                    onChange={e => handTracking.setMapping(axis, e.target.value as HandTarget)}
-                    className="flex-1 bg-black/60 border border-cold-white-dim/15 rounded text-[0.55rem] text-cold-white-dim px-1 py-0.5"
-                  >
-                    {TARGETS.map(t => <option key={t} value={t}>{TARGET_LABELS[t]}</option>)}
-                  </select>
+              {/* Per-hand axis mapping */}
+              {(['left', 'right'] as const).map((hand) => (
+                <div key={hand} className="space-y-0.5">
+                  <span className={`text-[0.5rem] font-bold ${hand === 'left' ? 'text-green-400/60' : 'text-cyan-400/60'}`}>
+                    {hand === 'left' ? '🫲 Left' : '🫱 Right'}
+                  </span>
+                  {(['x', 'y', 'z'] as const).map((axis) => (
+                    <div key={axis} className="flex items-center gap-2">
+                      <span className="text-[0.5rem] text-cold-white-dim/40 w-5 uppercase">{axis}</span>
+                      <select
+                        value={dualCfg[hand][`${axis}Target`]}
+                        onChange={e => handTracking.setHandMapping(hand, axis, e.target.value as HandTarget)}
+                        className="flex-1 bg-black/60 border border-cold-white-dim/15 rounded text-[0.5rem] text-cold-white-dim px-1 py-0.5"
+                      >
+                        {HAND_TARGET_LIST.map(t => <option key={t} value={t}>{HAND_TARGET_LABELS[t]}</option>)}
+                      </select>
+                    </div>
+                  ))}
                 </div>
               ))}
 

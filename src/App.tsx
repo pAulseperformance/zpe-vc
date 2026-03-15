@@ -29,9 +29,11 @@ export default function App() {
   // Hand tracking
   const hand = useHandTracker()
   const handNoteRef = useRef<{ release: () => void; bend: (f: number) => void } | null>(null)
+  const rightNoteRef = useRef<{ release: () => void; bend: (f: number) => void } | null>(null)
   const wasPinchingRef = useRef(false)
+  const wasRightPinchingRef = useRef(false)
   const prevGestureRef = useRef<string>('neutral')
-  const gestureResetRef = useRef<{ distortion?: number; reverbMix?: number } | null>(null)
+  const gestureResetRef = useRef<{ distortion?: number; reverbMix?: number; waveSpeed?: number } | null>(null)
   const handTrailRef = useRef(0) // cooldown for visual trail wave spawning
   const [currentFreq, setCurrentFreq] = useState(0)
 
@@ -174,24 +176,47 @@ export default function App() {
     let synthX = mouseX
     let synthY = mouseY
     if (useHand) {
-      // Left hand = primary cursor: pitch + filter (configurable)
       const primary = leftH.detected ? leftH : rightH
+
+      // Universal per-hand target routing
+      const applyHandTarget = (target: string, value: number) => {
+        switch (target) {
+          case 'volume': audio.setDroneVolume(value); break
+          case 'filterQ': audio.setFilterQ(1 + value * 20); break
+          case 'delayTime': audio.setDelayTime(value * 0.5); break
+          case 'delayFeedback': audio.setDelayFeedback(value); break
+          case 'delayMix': audio.setDelayMix(value); break
+          case 'reverbMix': audio.setReverbMix(value); break
+          case 'reverbDecay': audio.setReverbDecay(0.5 + value * 4); break
+          case 'distortion': audio.setDistortion(value); break
+          case 'detuneSpread': audio.setDetuneSpread(value * 50); break
+          case 'waveSpeed': setTuning(p => ({ ...p, waveSpeed: 0.1 + value * 16 })); break
+          case 'waveFreq': setTuning(p => ({ ...p, waveFreq: 1 + value * 50 })); break
+          case 'waveWidth': setTuning(p => ({ ...p, waveWidth: value * 0.3 })); break
+          case 'ripThreshold': setTuning(p => ({ ...p, ripThreshold: 0.5 + value * 4 })); break
+        }
+      }
+
+      // Route all mapped targets from both hands
+      for (const which of ['left', 'right'] as const) {
+        const hs = which === 'left' ? leftH : rightH
+        if (!hs.detected) continue
+        for (const axis of ['x', 'y', 'z'] as const) {
+          const dualCfg = hand.getDualConfig()
+          const target = dualCfg[which][`${axis}Target`]
+          if (target === 'none') continue
+          const val = axis === 'x' ? hs.x : axis === 'y' ? hs.y : hs.z
+          applyHandTarget(target, val)
+        }
+      }
+
+      // Synth X/Y from primary hand pitch/filter mappings
       const filterVal = hand.getTargetValue('filter')
       const pitchVal = hand.getTargetValue('pitch')
       synthX = filterVal ?? 0.5
       synthY = pitchVal ?? 0.5
 
-      // Right hand = FX: volume, delay, reverb (configurable)
-      if (rightH.detected) {
-        const volumeVal = hand.getTargetValueForHand('volume', 'right')
-        const delayVal = hand.getTargetValueForHand('delayMix', 'right')
-        const reverbVal = hand.getTargetValueForHand('reverbMix', 'right')
-        if (volumeVal !== null) audio.setDroneVolume(volumeVal)
-        if (delayVal !== null) audio.setDelayMix(delayVal)
-        if (reverbVal !== null) audio.setReverbMix(reverbVal)
-      }
-
-      // Gesture effects (from either hand)
+      // Gesture effects (from either hand) — audio + visual
       const gesture = primary.gesture
       if (gesture !== prevGestureRef.current) {
         // Restore previous gesture's params
@@ -200,55 +225,102 @@ export default function App() {
             audio.setDistortion(gestureResetRef.current.distortion)
           if (gestureResetRef.current.reverbMix !== undefined)
             audio.setReverbMix(gestureResetRef.current.reverbMix)
+          if (gestureResetRef.current.waveSpeed !== undefined)
+            setTuning(prev => ({ ...prev, waveSpeed: gestureResetRef.current!.waveSpeed! }))
           gestureResetRef.current = null
         }
-        // Apply new gesture
+        // Apply new gesture — audio + visual
         if (gesture === 'fist') {
           gestureResetRef.current = { distortion }
           audio.setDistortion(Math.min(1, distortion + 0.6))
+          // Visual: burst of 5 waves from hand position
+          for (let i = 0; i < 5; i++) {
+            const angle = (i / 5) * Math.PI * 2
+            simClickQueueRef.current.push({
+              x: primary.x + Math.cos(angle) * 0.03,
+              y: primary.y + Math.sin(angle) * 0.03,
+            })
+          }
         } else if (gesture === 'spread') {
           gestureResetRef.current = { reverbMix }
           audio.setReverbMix(Math.min(1, reverbMix + 0.5))
+          // Visual: radial burst of 8 waves
+          for (let i = 0; i < 8; i++) {
+            const angle = (i / 8) * Math.PI * 2
+            simClickQueueRef.current.push({
+              x: primary.x + Math.cos(angle) * 0.08,
+              y: primary.y + Math.sin(angle) * 0.08,
+            })
+          }
         } else if (gesture === 'open') {
-          gestureResetRef.current = {}
+          gestureResetRef.current = { waveSpeed: tuning.waveSpeed }
           audio.setDroneVolume(0)
+          // Visual: freeze — set waveSpeed to near-0
+          setTuning(prev => ({ ...prev, waveSpeed: 0.01 }))
         }
         prevGestureRef.current = gesture
       }
     }
     audio.update(energy, tuning.ripThreshold, interferenceRatio, synthX, synthY)
 
-    // Hand pinch → note trigger + pitch bend (either hand)
+    // Two-hand split — each hand triggers independent notes
     if (useHand && audioEnabled) {
-      const primary = leftH.detected ? leftH : rightH
-      const pitchVal = hand.getTargetValue('pitch')
-      const notePitch = pitchVal ?? primary.y
-      const freq = yToFreq(notePitch, synthScale)
-      if (primary.pinching && !wasPinchingRef.current) {
-        handNoteRef.current?.release()
-        handNoteRef.current = audio.playNote(freq, 0.8, true)
-        simClickQueueRef.current.push({ x: primary.x, y: primary.y })
-        setCurrentFreq(freq)
-        if (midiEnabled) midiRef.current.noteOn(freq)
-        if (looperRecording) looperRef.current.record({ type: 'noteOn', freq, x: primary.x, y: primary.y })
-      } else if (!primary.pinching && wasPinchingRef.current) {
-        handNoteRef.current?.release()
-        handNoteRef.current = null
-        setCurrentFreq(0)
-        if (midiEnabled) midiRef.current.noteOff()
-        if (looperRecording) looperRef.current.record({ type: 'noteOff' })
-      } else if (primary.pinching && handNoteRef.current) {
-        handNoteRef.current.bend(freq)
-        setCurrentFreq(freq)
-        if (midiEnabled) midiRef.current.pitchBend(freq)
-        if (looperRecording) looperRef.current.record({ type: 'bend', freq })
+      // Left hand note
+      if (leftH.detected) {
+        const pitchVal = hand.getTargetValueForHand('pitch', 'left')
+        const notePitch = pitchVal ?? leftH.y
+        const freq = yToFreq(notePitch, synthScale)
+        if (leftH.pinching && !wasPinchingRef.current) {
+          handNoteRef.current?.release()
+          handNoteRef.current = audio.playNote(freq, 0.8, true)
+          simClickQueueRef.current.push({ x: leftH.x, y: leftH.y })
+          setCurrentFreq(freq)
+          if (midiEnabled) midiRef.current.noteOn(freq)
+          if (looperRecording) looperRef.current.record({ type: 'noteOn', freq, x: leftH.x, y: leftH.y })
+        } else if (!leftH.pinching && wasPinchingRef.current) {
+          handNoteRef.current?.release()
+          handNoteRef.current = null
+          if (!rightH.pinching) setCurrentFreq(0)
+          if (midiEnabled) midiRef.current.noteOff()
+          if (looperRecording) looperRef.current.record({ type: 'noteOff' })
+        } else if (leftH.pinching && handNoteRef.current) {
+          handNoteRef.current.bend(freq)
+          setCurrentFreq(freq)
+          if (midiEnabled) midiRef.current.pitchBend(freq)
+          if (looperRecording) looperRef.current.record({ type: 'bend', freq })
+        }
+        wasPinchingRef.current = leftH.pinching
       }
-      wasPinchingRef.current = primary.pinching
+
+      // Right hand note (harmony)
+      if (rightH.detected) {
+        const pitchVal = hand.getTargetValueForHand('pitch', 'right')
+        const notePitch = pitchVal ?? rightH.y
+        const freq = yToFreq(notePitch, synthScale)
+        if (rightH.pinching && !wasRightPinchingRef.current) {
+          rightNoteRef.current?.release()
+          rightNoteRef.current = audio.playNote(freq, 0.6, true)
+          simClickQueueRef.current.push({ x: rightH.x, y: rightH.y })
+          if (!leftH.pinching) setCurrentFreq(freq)
+          if (looperRecording) looperRef.current.record({ type: 'noteOn', freq, x: rightH.x, y: rightH.y })
+        } else if (!rightH.pinching && wasRightPinchingRef.current) {
+          rightNoteRef.current?.release()
+          rightNoteRef.current = null
+          if (!leftH.pinching) setCurrentFreq(0)
+          if (looperRecording) looperRef.current.record({ type: 'noteOff' })
+        } else if (rightH.pinching && rightNoteRef.current) {
+          rightNoteRef.current.bend(freq)
+          if (!leftH.pinching) setCurrentFreq(freq)
+          if (looperRecording) looperRef.current.record({ type: 'bend', freq })
+        }
+        wasRightPinchingRef.current = rightH.pinching
+      }
 
       // Visual trail: spawn waves along hand path every ~80ms
-      if (primary.detected && now - handTrailRef.current > 80) {
+      const trailHand = leftH.detected ? leftH : rightH
+      if (trailHand.detected && now - handTrailRef.current > 80) {
         handTrailRef.current = now
-        simClickQueueRef.current.push({ x: primary.x, y: primary.y })
+        simClickQueueRef.current.push({ x: trailHand.x, y: trailHand.y })
       }
     }
 
