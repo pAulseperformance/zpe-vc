@@ -32,32 +32,32 @@ export interface ShaderTuning {
 }
 
 export const DEFAULT_TUNING: ShaderTuning = {
-  waveSpeed: 1.15,
+  waveSpeed: 1.2,
   waveFreq: 150,
   waveWidth: 0.1,
-  emDamping: 0.5,
-  gravDamping: 0.2,
+  emDamping: 1.6,
+  gravDamping: 1.6,
   waveLifetime: 15,
-  maxWaves: 10,
-  lenzStrength: 0.5,
+  maxWaves: 30,
+  lenzStrength: 0.08,
   lenzWake: 0.6,
   hoverRadius: 0.05,
   energyDecay: 30,
   velocityMult: 30,
-  clickSpike: 10,
+  clickSpike: 20,
   ripThreshold: 200,
-  parallaxDepth: 0.15,
+  parallaxDepth: 0,
   heatDecay: 0.2,
-  heatAttack: 0.5,
-  heatIntensity: 1,
-  interferenceBlend: 1,
-  iridescence: 0.5,
-  paletteMode: 1,  // Default: artistic
-  starField: 0,     // Off by default
-  wavelength: 2,    // Visible light (default)
+  heatAttack: 0.65,
+  heatIntensity: 0.55,
+  interferenceBlend: 0.55,
+  iridescence: 0.6,
+  paletteMode: 0,   // Default: physical
+  starField: 0,
+  wavelength: 2,     // Visible light
   barrierEnabled: 0,
-  barrierY: 0.5,
-  slitCount: 2,       // Double slit (Young's experiment)
+  barrierY: 0.27,
+  slitCount: 3,
   slitWidth: 0.04,
   slitSeparation: 0.15,
   diffSamples: 12,
