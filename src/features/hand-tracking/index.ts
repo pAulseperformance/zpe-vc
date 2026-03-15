@@ -1,3 +1,6 @@
 export { useHandTracker } from './ui/useHandTracker'
+export { NoteOverlay } from './ui/NoteOverlay'
+export { Looper } from './lib/looper'
 export { DEFAULT_HAND_MAPPING } from './lib/gesture-map'
 export type { HandState, DualHandState, HandMappingConfig, HandTarget, Gesture } from './ui/useHandTracker'
+export type { LoopEvent } from './lib/looper'

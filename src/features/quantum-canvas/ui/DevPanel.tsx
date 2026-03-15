@@ -82,6 +82,14 @@ interface DevPanelProps {
     setSmoothing: (v: number) => void
     setPinchThreshold: (v: number) => void
     getConfig: () => { xTarget: HandTarget; yTarget: HandTarget; zTarget: HandTarget; pinchThreshold: number; smoothing: number }
+    looper?: {
+      recording: boolean
+      playing: boolean
+      onRecord: () => void
+      onPlay: () => void
+      onClear: () => void
+      eventCount: number
+    }
   }
 }
 
@@ -311,6 +319,42 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
                   className="flex-1 h-1 accent-electric-purple" />
                 <span className="text-[0.55rem] w-8 text-right">{(cfg.pinchThreshold * 100).toFixed(0)}</span>
               </div>
+
+              {/* Looper controls */}
+              {handTracking.looper && (
+                <div className="flex items-center gap-1.5 mt-1">
+                  <button
+                    onClick={handTracking.looper.onRecord}
+                    className={`px-2 py-0.5 rounded text-[0.55rem] font-bold transition-colors ${
+                      handTracking.looper.recording
+                        ? 'bg-red-500/30 text-red-400 border border-red-500/50 animate-pulse'
+                        : 'bg-white/5 text-cold-white-dim/50 border border-white/10 hover:bg-white/10'
+                    }`}
+                  >
+                    {handTracking.looper.recording ? '⏹ Stop' : '⏺ Rec'}
+                  </button>
+                  <button
+                    onClick={handTracking.looper.onPlay}
+                    disabled={handTracking.looper.eventCount === 0}
+                    className={`px-2 py-0.5 rounded text-[0.55rem] font-bold transition-colors ${
+                      handTracking.looper.playing
+                        ? 'bg-green-500/30 text-green-400 border border-green-500/50'
+                        : 'bg-white/5 text-cold-white-dim/50 border border-white/10 hover:bg-white/10'
+                    } disabled:opacity-30`}
+                  >
+                    {handTracking.looper.playing ? '⏹ Stop' : '▶ Play'}
+                  </button>
+                  <button
+                    onClick={handTracking.looper.onClear}
+                    className="px-2 py-0.5 rounded text-[0.55rem] bg-white/5 text-cold-white-dim/50 border border-white/10 hover:bg-white/10"
+                  >
+                    ✕
+                  </button>
+                  {handTracking.looper.eventCount > 0 && (
+                    <span className="text-[0.5rem] text-cold-white-dim/30">{handTracking.looper.eventCount} events</span>
+                  )}
+                </div>
+              )}
             </div>
           )
         })()}

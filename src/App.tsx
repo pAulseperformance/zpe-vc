@@ -6,7 +6,7 @@ import { TerminalIntake } from '@/widgets/terminal-intake'
 import { DevModeButton } from '@/widgets/dev-mode-button/DevModeButton'
 import { useSynth, yToFreq } from '@/features/quantum-audio'
 import type { SynthWaveform, ScaleName } from '@/features/quantum-audio'
-import { useHandTracker } from '@/features/hand-tracking'
+import { useHandTracker, NoteOverlay, Looper } from '@/features/hand-tracking'
 
 const IS_DEV = import.meta.env.DEV
 
@@ -32,6 +32,13 @@ export default function App() {
   const wasPinchingRef = useRef(false)
   const prevGestureRef = useRef<string>('neutral')
   const gestureResetRef = useRef<{ distortion?: number; reverbMix?: number } | null>(null)
+  const handTrailRef = useRef(0) // cooldown for visual trail wave spawning
+  const [currentFreq, setCurrentFreq] = useState(0)
+
+  // Looper
+  const looperRef = useRef(new Looper())
+  const [looperRecording, setLooperRecording] = useState(false)
+  const [looperPlaying, setLooperPlaying] = useState(false)
 
   // Synth controls
   const [synthWaveform, setSynthWaveform] = useState<SynthWaveform>('sine')
@@ -209,20 +216,31 @@ export default function App() {
       const primary = leftH.detected ? leftH : rightH
       const pitchVal = hand.getTargetValue('pitch')
       const notePitch = pitchVal ?? primary.y
+      const freq = yToFreq(notePitch, synthScale)
       if (primary.pinching && !wasPinchingRef.current) {
         handNoteRef.current?.release()
-        const freq = yToFreq(notePitch, synthScale)
         handNoteRef.current = audio.playNote(freq, 0.8, true)
         simClickQueueRef.current.push({ x: primary.x, y: primary.y })
+        setCurrentFreq(freq)
+        // Looper: record note on
+        if (looperRecording) looperRef.current.record({ type: 'noteOn', freq, x: primary.x, y: primary.y })
       } else if (!primary.pinching && wasPinchingRef.current) {
         handNoteRef.current?.release()
         handNoteRef.current = null
+        setCurrentFreq(0)
+        if (looperRecording) looperRef.current.record({ type: 'noteOff' })
       } else if (primary.pinching && handNoteRef.current) {
-        // Pitch bend: while pinching, smoothly glide frequency with hand Y
-        const freq = yToFreq(notePitch, synthScale)
         handNoteRef.current.bend(freq)
+        setCurrentFreq(freq)
+        if (looperRecording) looperRef.current.record({ type: 'bend', freq })
       }
       wasPinchingRef.current = primary.pinching
+
+      // Visual trail: spawn waves along hand path every ~80ms
+      if (primary.detected && now - handTrailRef.current > 80) {
+        handTrailRef.current = now
+        simClickQueueRef.current.push({ x: primary.x, y: primary.y })
+      }
     }
 
     // FFT → Wave Spawning: bass hits auto-spawn waves
@@ -281,6 +299,14 @@ export default function App() {
           />
         </Suspense>
       </motion.div>
+
+      {/* Hand tracking note overlay */}
+      <NoteOverlay
+        freq={currentFreq}
+        active={hand.active}
+        pinching={hand.handState.pinching}
+        gesture={hand.handState.gesture ?? 'neutral'}
+      />
 
       <AnimatePresence>
         {isForging && <TerminalIntake onBootDone={handleBootDone} />}
@@ -363,7 +389,51 @@ export default function App() {
           envRelease={envRelease}
           onEnvRelease={(v) => { setEnvRelease(v); audio.setEnvelope(envAttack, envDecay, envSustain, v) }}
           fftRef={audio.fftRef}
-          handTracking={hand}
+          handTracking={{
+            ...hand,
+            looper: {
+              recording: looperRecording,
+              playing: looperPlaying,
+              eventCount: looperRef.current.eventCount,
+              onRecord: () => {
+                if (looperRecording) {
+                  looperRef.current.stopRecording()
+                  setLooperRecording(false)
+                } else {
+                  looperRef.current.startRecording()
+                  setLooperRecording(true)
+                }
+              },
+              onPlay: () => {
+                if (looperPlaying) {
+                  looperRef.current.stopPlayback()
+                  setLooperPlaying(false)
+                } else {
+                  let activeNote: { release: () => void; bend: (f: number) => void } | null = null
+                  looperRef.current.startPlayback((event) => {
+                    if (event.type === 'noteOn' && event.freq) {
+                      activeNote?.release()
+                      activeNote = audio.playNote(event.freq, 0.8, true)
+                      if (event.x !== undefined && event.y !== undefined) {
+                        simClickQueueRef.current.push({ x: event.x, y: event.y })
+                      }
+                    } else if (event.type === 'noteOff') {
+                      activeNote?.release()
+                      activeNote = null
+                    } else if (event.type === 'bend' && event.freq && activeNote) {
+                      activeNote.bend(event.freq)
+                    }
+                  })
+                  setLooperPlaying(true)
+                }
+              },
+              onClear: () => {
+                looperRef.current.clear()
+                setLooperRecording(false)
+                setLooperPlaying(false)
+              },
+            },
+          }}
         />
       )}
     </div>
