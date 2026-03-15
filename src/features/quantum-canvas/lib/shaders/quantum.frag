@@ -181,9 +181,12 @@ void main() {
     float fieldDecay = exp(-max(waveFront - dist, 0.0) * 3.0); // decay behind front
     float extendedField = behindWavefront * fieldDecay * emDamping;
 
-    // ── Accumulate for interference (uses EXTENDED field, not thin ring) ──
-    waveFieldSigned += emWaveSigned * extendedField;
-    waveFieldEnvelope += abs(emWaveSigned) * extendedField;
+    // ── Clean sine for interference — no noise, no harmonics ──
+    // Single source: abs(sin(d*f)) / abs(sin(d*f)) = 1.0 everywhere → no self-interference
+    // Two sources: sin(d1*f) + sin(d2*f) cancels where d1-d2 = λ/2 → visible dark bands
+    float cleanWave = sin(dist * uWaveFreq - age * 30.0);
+    waveFieldSigned += cleanWave * extendedField;
+    waveFieldEnvelope += abs(cleanWave) * extendedField;
 
     // ── Additive color (old path — uses sharp ring for visual wavefront) ──
     float specBase = emIntensity * 0.4 + eNorm * 0.25 + age * 0.1;

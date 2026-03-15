@@ -147,7 +147,6 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
   const [simSeparation, setSimSeparation] = useState(0.2)
   const [simMouseSpeed, setSimMouseSpeed] = useState(0.5)
   const [simMouseRadius, setSimMouseRadius] = useState(0.15)
-  const simTickRef = useRef(0)
   const simMouseFrameRef = useRef(0)
 
   // Auto-sim click interval
@@ -157,13 +156,11 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
       if (simMode === 'single') {
         onSimClick(0.5, 0.5)
       } else {
+        // Fire BOTH origins simultaneously for coherent interference
+        // Same age = stationary dark bands (classic double-slit)
         const half = simSeparation / 2
-        if (simTickRef.current % 2 === 0) {
-          onSimClick(0.5 - half, 0.5)
-        } else {
-          onSimClick(0.5 + half, 0.5)
-        }
-        simTickRef.current++
+        onSimClick(0.5 - half, 0.5)
+        onSimClick(0.5 + half, 0.5)
       }
     }, 1000 / simRate)
     return () => clearInterval(interval)
