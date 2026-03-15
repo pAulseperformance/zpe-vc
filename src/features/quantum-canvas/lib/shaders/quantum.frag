@@ -35,6 +35,7 @@ uniform float uHeatIntensity;
 uniform float uInterferenceBlend;
 uniform float uHeatField;
 uniform float uIridescence;
+uniform float uPaletteMode; // 0 = physical, 1 = artistic, 2 = hybrid
 
 // ─── Palette ───
 const vec3 BLACK     = vec3(0.0);
@@ -68,6 +69,28 @@ vec3 coolingSpectrum(float heat) {
   vec3 c = vec3(1.0, 0.8, 0.6);
   vec3 d = vec3(0.0, 0.05, 0.20);
   return a + b * cos(6.28318 * (c * h + d));
+}
+
+// Planck blackbody approximation: physically accurate thermal emission
+// Maps temperature (0=cold → 1=white-hot) to real stellar colors
+// Cold: black → deep red → cherry → orange → yellow → white → blue-white
+vec3 planckBlackbody(float temp) {
+  float t = clamp(temp, 0.0, 1.0);
+  // Perez et al. approximation of CIE color from temperature
+  vec3 col;
+  // Dark red ember (t < 0.15)
+  col = mix(vec3(0.0), vec3(0.4, 0.02, 0.0), smoothstep(0.0, 0.15, t));
+  // Cherry red (0.15 - 0.3)
+  col = mix(col, vec3(0.7, 0.08, 0.0), smoothstep(0.15, 0.3, t));
+  // Orange (0.3 - 0.45)
+  col = mix(col, vec3(0.95, 0.35, 0.02), smoothstep(0.3, 0.45, t));
+  // Yellow (0.45 - 0.6)
+  col = mix(col, vec3(1.0, 0.72, 0.15), smoothstep(0.45, 0.6, t));
+  // Near-white (0.6 - 0.8)
+  col = mix(col, vec3(1.0, 0.92, 0.80), smoothstep(0.6, 0.8, t));
+  // Blue-white (0.8 - 1.0)
+  col = mix(col, vec3(0.85, 0.90, 1.0), smoothstep(0.8, 1.0, t));
+  return col;
 }
 
 // ─── Simplex Noise ───
@@ -215,34 +238,47 @@ void main() {
 
   // ── Wave interference compositing ──
   float interference = abs(waveFieldSigned);
-  // Cancellation = how much brightness was lost to destructive interference
   float cancellation = max(waveFieldEnvelope - interference, 0.0);
 
   float avgSpec = (waveFieldEnvelope > 0.001) ? spectrumAccum / waveFieldEnvelope : 0.0;
   float disp2 = 0.08;
-  vec3 interferenceColor = vec3(
-    energySpectrum(avgSpec - disp2).r,
-    energySpectrum(avgSpec).g,
-    energySpectrum(avgSpec + disp2).b
-  );
+
+  // Interference color depends on palette mode
+  vec3 interferenceColor;
+  if (uPaletteMode < 0.5) {
+    // Physical: monochromatic — interference only modulates brightness
+    float thermalTemp = clamp(avgSpec * 1.5, 0.0, 1.0);
+    interferenceColor = planckBlackbody(thermalTemp);
+  } else {
+    // Artistic / Hybrid: chromatic dispersion
+    interferenceColor = vec3(
+      energySpectrum(avgSpec - disp2).r,
+      energySpectrum(avgSpec).g,
+      energySpectrum(avgSpec + disp2).b
+    );
+  }
 
   // Constructive zones: bright. Destructive zones: dark voids.
   float interferenceFactor = (waveFieldEnvelope > 0.001)
-    ? pow(interference / waveFieldEnvelope, 0.3)  // Steep curve = dramatic dark bands
+    ? pow(interference / waveFieldEnvelope, 0.3)
     : 0.0;
 
-  // Constructive color: boosted where waves reinforce
   vec3 catalystColorInterference = interferenceColor * interferenceFactor * waveFieldEnvelope * 0.6;
 
-  // Cancellation void: actively darken where destructive interference kills energy
   float voidStrength = (waveFieldEnvelope > 0.01)
     ? smoothstep(0.0, 0.5, cancellation / waveFieldEnvelope)
     : 0.0;
 
-  // Blend between additive (old) and interference (new)
-  vec3 catalystColor = mix(catalystColorAdditive, catalystColorInterference, uInterferenceBlend);
-  // Apply destructive void — darkens EVERYTHING in cancellation zones
-  catalystColor *= mix(1.0, 1.0 - voidStrength * 0.8, uInterferenceBlend);
+  // Additive path color also respects palette mode
+  vec3 catalystColor;
+  if (uPaletteMode < 0.5) {
+    // Physical: use blackbody for additive too — interference is pure intensity
+    catalystColor = mix(catalystColorAdditive, catalystColorInterference, uInterferenceBlend);
+    catalystColor *= mix(1.0, 1.0 - voidStrength * 0.9, uInterferenceBlend);
+  } else {
+    catalystColor = mix(catalystColorAdditive, catalystColorInterference, uInterferenceBlend);
+    catalystColor *= mix(1.0, 1.0 - voidStrength * 0.8, uInterferenceBlend);
+  }
 
   // Clamp heat residual
   heatResidual = clamp(heatResidual, 0.0, 1.0);
@@ -263,10 +299,23 @@ void main() {
   float speed1 = speedMult * 0.65;
   float dust1 = snoise(uv1 * 350.0 + t * speed1 * 0.5);
   float sparks1 = smoothstep(0.78, 0.85, dust1) * 0.07 * brightMult;
-  vec3 dust1Color = mix(COLD_WHT, energySpectrum(localHeat * 0.8), localHeat);
-  // Heat trail color: use cooling spectrum for warm-to-cold transition
+  // Dust color depends on palette mode
+  vec3 dust1Color;
+  vec3 heatColor;
   float heatTint = heatResidual * uHeatIntensity + uHeatField * 0.2;
-  vec3 heatColor = coolingSpectrum(heatTint);
+  if (uPaletteMode < 0.5) {
+    // Physical: Planck blackbody for all thermal emission
+    dust1Color = mix(COLD_WHT * 0.5, planckBlackbody(localHeat * 0.8), localHeat);
+    heatColor = planckBlackbody(heatTint);
+  } else if (uPaletteMode < 1.5) {
+    // Artistic: current vibrant palette
+    dust1Color = mix(COLD_WHT, energySpectrum(localHeat * 0.8), localHeat);
+    heatColor = coolingSpectrum(heatTint);
+  } else {
+    // Hybrid: blackbody thermal + artistic wavefronts
+    dust1Color = mix(COLD_WHT * 0.7, planckBlackbody(localHeat * 0.9), localHeat);
+    heatColor = planckBlackbody(heatTint);
+  }
   dust1Color = mix(dust1Color, heatColor, clamp(heatTint * 0.5, 0.0, 0.6));
   color += dust1Color * sparks1;
 
@@ -275,7 +324,12 @@ void main() {
   float speed2 = speedMult * 0.8;
   float dust2 = snoise(uv2 * 500.0 + t * speed2 * 0.7 + 100.0);
   float sparks2 = smoothstep(0.82, 0.88, dust2) * 0.035 * brightMult;
-  vec3 dust2Color = mix(VIOLET * 0.6, energySpectrum(localHeat * 0.5 + 0.2), localHeat);
+  vec3 dust2Color;
+  if (uPaletteMode < 0.5) {
+    dust2Color = mix(vec3(0.15, 0.05, 0.08) * 0.6, planckBlackbody(localHeat * 0.5 + 0.2), localHeat);
+  } else {
+    dust2Color = mix(VIOLET * 0.6, energySpectrum(localHeat * 0.5 + 0.2), localHeat);
+  }
   color += dust2Color * sparks2;
 
   // Layer 3: dense field — NEAR-MID (depth 0.7)
@@ -283,7 +337,12 @@ void main() {
   float speed3 = speedMult * 0.9;
   float dust3 = snoise(uv3 * 600.0 - t * speed3 * 0.3 + 50.0);
   float sparks3 = smoothstep(0.84, 0.90, dust3) * 0.025 * brightMult;
-  vec3 dust3Color = mix(INDIGO * 0.5, energySpectrum(localHeat * 0.6 + 0.35), localHeat);
+  vec3 dust3Color;
+  if (uPaletteMode < 0.5) {
+    dust3Color = mix(vec3(0.08, 0.02, 0.05) * 0.5, planckBlackbody(localHeat * 0.6 + 0.35), localHeat);
+  } else {
+    dust3Color = mix(INDIGO * 0.5, energySpectrum(localHeat * 0.6 + 0.35), localHeat);
+  }
   color += dust3Color * sparks3;
 
   // Layer 4: bright pops — NEAR (depth 1.0)

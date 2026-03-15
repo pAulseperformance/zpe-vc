@@ -70,6 +70,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
       uInterferenceBlend: { value: tuning.interferenceBlend },
       uHeatField: { value: 0 },
       uIridescence: { value: tuning.iridescence ?? 0.5 },
+      uPaletteMode: { value: tuning.paletteMode ?? 1 },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
@@ -208,6 +209,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
     mat.uniforms.uInterferenceBlend.value = t.interferenceBlend
     mat.uniforms.uHeatField.value = heatFieldRef.current
     mat.uniforms.uIridescence.value = t.iridescence ?? 0.5
+    mat.uniforms.uPaletteMode.value = t.paletteMode ?? 1
   })
 
   return (

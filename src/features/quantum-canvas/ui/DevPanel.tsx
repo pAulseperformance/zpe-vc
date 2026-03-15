@@ -20,6 +20,7 @@ export interface ShaderTuning {
   heatIntensity: number
   interferenceBlend: number
   iridescence: number
+  paletteMode: number  // 0=physical, 1=artistic, 2=hybrid
 }
 
 export const DEFAULT_TUNING: ShaderTuning = {
@@ -42,6 +43,7 @@ export const DEFAULT_TUNING: ShaderTuning = {
   heatIntensity: 1,
   interferenceBlend: 1,
   iridescence: 0.5,
+  paletteMode: 1,  // Default: artistic
 }
 
 const STORAGE_KEY = 'zpe-shader-presets'
@@ -285,6 +287,29 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
             <span className="text-[0.55rem] text-electric-purple w-8 text-right">{energyOverride.toFixed(0)}</span>
           </div>
         )}
+      </div>
+
+      {/* Palette mode toggle */}
+      <div className="flex items-center gap-1.5 mb-2">
+        <span className="text-[0.55rem] text-cold-white-dim/40 w-14 shrink-0">Palette</span>
+        {([
+          { mode: 0, label: '🔬 Physical', title: 'Planck blackbody + intensity-only interference' },
+          { mode: 1, label: '🎨 Artistic', title: 'Vibrant cosine palette + chromatic dispersion' },
+          { mode: 2, label: '⚗️ Hybrid', title: 'Blackbody thermal + artistic wavefronts' },
+        ] as const).map(({ mode, label, title }) => (
+          <button
+            key={mode}
+            onClick={() => onChange({ ...tuning, paletteMode: mode })}
+            title={title}
+            className={`text-[0.5rem] px-1.5 py-0.5 rounded border ${
+              tuning.paletteMode === mode
+                ? 'text-electric-purple border-electric-purple/40 bg-electric-purple/10'
+                : 'text-cold-white-dim/30 border-cold-white-dim/10 hover:border-electric-purple/20'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* Sliders */}
