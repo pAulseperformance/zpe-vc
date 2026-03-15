@@ -6,7 +6,8 @@ import * as THREE from 'three'
 
 import vertexShader from '../lib/shaders/quantum.vert'
 import fragmentShader from '../lib/shaders/quantum.frag'
-import type { ShaderTuning } from './DevPanel'
+import type { ShaderTuning } from '../lib/shader-tuning'
+import { computeInterferenceRatio } from '../lib/compute-interference'
 
 /* ─── Constants ─── */
 const MAX_CATALYSTS = 100
@@ -23,7 +24,7 @@ interface Catalyst {
 interface ShaderPlaneProps {
   onRip: () => void
   tuning: ShaderTuning
-  onEnergyChange: (energy: number) => void
+  onEnergyChange: (energy: number, interferenceRatio: number) => void
   energyOverride: number | null
   simClickQueue: MutableRefObject<Array<{x: number, y: number}>>
   simMouseActive: boolean
@@ -158,8 +159,18 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
     heatFieldRef.current *= Math.pow(0.97, delta * 60) // Slow independent decay
     heatFieldRef.current = Math.min(heatFieldRef.current, 3.0) // Cap to prevent runaway
 
-    // Report energy to dev panel
-    onEnergyChange(effectiveEnergy)
+    // Compute JS-side interference ratio for audio feedback
+    const interferenceRatio = computeInterferenceRatio(
+      cats,
+      mouseRef.current.x,
+      mouseRef.current.y,
+      now,
+      t.waveFreq,
+      t.waveLifetime,
+    )
+
+    // Report energy + interference to parent
+    onEnergyChange(effectiveEnergy, interferenceRatio)
 
     if (energyRef.current >= t.ripThreshold && !hasRippedRef.current) {
       hasRippedRef.current = true
@@ -244,7 +255,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
 interface QuantumCanvasProps {
   onRip: () => void
   tuning: ShaderTuning
-  onEnergyChange: (energy: number) => void
+  onEnergyChange: (energy: number, interferenceRatio: number) => void
   energyOverride: number | null
   simClickQueue: MutableRefObject<Array<{x: number, y: number}>>
   simMouseActive: boolean

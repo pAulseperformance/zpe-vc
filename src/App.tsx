@@ -44,15 +44,15 @@ export default function App() {
 
   // Throttle energy display updates to ~10fps to avoid re-render spam
   const lastUpdateRef = useRef(0)
-  const handleEnergyChange = useCallback((energy: number) => {
+  const handleEnergyChange = useCallback((energy: number, interferenceRatio: number) => {
     energyRef.current = energy
     const now = Date.now()
     if (now - lastUpdateRef.current > 100) {
       lastUpdateRef.current = now
       setEnergyDisplay(energy)
     }
-    // Update audio per frame
-    audio.update(energy, tuning.ripThreshold, 1.0)
+    // Update audio per frame — interferenceRatio modulates shimmer volume
+    audio.update(energy, tuning.ripThreshold, interferenceRatio)
   }, [audio, tuning.ripThreshold])
 
   return (
