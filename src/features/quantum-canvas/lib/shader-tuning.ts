@@ -383,6 +383,52 @@ export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
     },
     ripBlocked: true,
   },
+  'Supermassive': {
+    ...DEFAULT_TUNING,
+    waveSpeed: 100,
+    waveFreq: 7500,
+    waveWidth: 5,
+    emDamping: 1.6,
+    gravDamping: 1.6,
+    waveLifetime: 15,
+    maxWaves: 85,
+    lenzStrength: 0,
+    lenzWake: 0,
+    hoverRadius: 30,
+    energyDecay: 30,
+    velocityMult: 30,
+    clickSpike: 20,
+    ripThreshold: 200,
+    parallaxDepth: 0,
+    heatDecay: 7.8,
+    heatAttack: 24.25,
+    heatIntensity: 1.3,
+    interferenceBlend: 45.15,
+    iridescence: 0.85,
+    paletteMode: 0,
+    starField: 0.5,
+    wavelength: 2,
+    barrierEnabled: 0,
+    barrierY: 0.5,
+    slitCount: 2,
+    slitWidth: 0.05,
+    slitSeparation: 0.2,
+    diffSamples: 8,
+    pointerHover: true,
+    hoverWarp: 0.6,
+    spinSpeed: 250,
+    viewScale: 150,
+    zoomMode: 0,
+    autoSim: {
+      active: true,
+      mode: 'gravity',
+      rate: 10,
+      clicksOn: true,
+      mouseOn: true,
+    },
+    ripBlocked: true,
+    godMode: true,
+  },
 }
 
 export interface SliderDef {
@@ -399,11 +445,11 @@ export const MOUSE_SLIDERS: SliderDef[] = [
 ]
 
 export const OBJECT_SLIDERS: SliderDef[] = [
-  { key: 'waveSpeed', label: 'Wave Speed', min: 0.1, max: 2.0, step: 0.05 },
-  { key: 'waveFreq', label: 'Wave Freq', min: 10, max: 150, step: 5 },
-  { key: 'waveWidth', label: 'Wave Width', min: 0.005, max: 0.1, step: 0.005 },
-  { key: 'emDamping', label: 'EM Damping', min: 0.1, max: 10, step: 0.1 },
-  { key: 'gravDamping', label: 'Grav Damping', min: 0.05, max: 5, step: 0.05 },
+  { key: 'waveSpeed', label: 'Wave Speed', min: 0.1, max: 100.0, step: 0.05 },
+  { key: 'waveFreq', label: 'Wave Freq', min: 10, max: 7500, step: 5 },
+  { key: 'waveWidth', label: 'Wave Width', min: 0.005, max: 5.0, step: 0.005 },
+  { key: 'emDamping', label: 'EM Damping', min: 0.1, max: 20, step: 0.1 },
+  { key: 'gravDamping', label: 'Grav Damping', min: 0.05, max: 20, step: 0.05 },
   { key: 'waveLifetime', label: 'Wave Life (s)', min: 1, max: 15, step: 0.5 },
   { key: 'maxWaves', label: 'Max Waves', min: 5, max: 100, step: 5 },
   { key: 'lenzStrength', label: 'Lenz Strength', min: 0.0, max: 0.5, step: 0.005 },
@@ -419,11 +465,11 @@ export const OBJECT_SLIDERS: SliderDef[] = [
 ]
 
 export const UNIVERSE_SLIDERS: SliderDef[] = [
-  { key: 'parallaxDepth', label: 'Parallax', min: 0.0, max: 0.15, step: 0.005 },
-  { key: 'spinSpeed', label: 'Spin Speed', min: 0.0, max: 5.0, step: 0.1 },
-  { key: 'iridescence', label: 'Iridescence', min: 0.0, max: 1.0, step: 0.05 },
-  { key: 'starField', label: 'Star Field', min: 0.0, max: 1.0, step: 0.05 },
-  { key: 'viewScale', label: 'View Scale', min: 0.5, max: 3.0, step: 0.05 },
+  { key: 'parallaxDepth', label: 'Parallax', min: 0, max: 2, step: 0.05 },
+  { key: 'spinSpeed', label: 'Spin Speed', min: 0, max: 250, step: 0.1 },
+  { key: 'iridescence', label: 'Iridescence', min: 0, max: 50, step: 0.1 },
+  { key: 'starField', label: 'Star Field', min: 0, max: 20, step: 0.1 },
+  { key: 'viewScale', label: 'View Scale', min: 0.5, max: 150, step: 0.1 },
 ]
 
 /** All sliders combined (backward compat) */
