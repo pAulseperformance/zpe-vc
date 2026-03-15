@@ -228,6 +228,8 @@ export default function App() {
             onManualClick={(x, _y) => audio.triggerClick(x)}
             onCanvasReady={(c) => { canvasRef.current = c }}
             audioBands={audioReactive ? audio.fftRef : undefined}
+            handTrackingActive={hand.active}
+            handTrackingPos={hand.stateRef}
           />
         </Suspense>
       </motion.div>

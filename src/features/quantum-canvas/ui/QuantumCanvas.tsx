@@ -33,9 +33,11 @@ interface ShaderPlaneProps {
   onZoomChange: (delta: number) => void
   onManualClick?: (x: number, y: number) => void
   audioBands?: MutableRefObject<{bass: number, mid: number, treble: number}>
+  handTrackingActive?: boolean
+  handTrackingPos?: MutableRefObject<{x: number, y: number, detected: boolean}>
 }
 
-function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick, audioBands }: ShaderPlaneProps) {
+function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick, audioBands, handTrackingActive, handTrackingPos }: ShaderPlaneProps) {
   const meshRef = useRef<THREE.Mesh>(null)
   const { size } = useThree()
 
@@ -153,6 +155,11 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
     // Override mouse position with sim mouse when active
     if (simMouseActive) {
       mouseRef.current.set(simMousePos.current.x, simMousePos.current.y)
+    }
+
+    // Override mouse position with hand tracking when active
+    if (handTrackingActive && handTrackingPos?.current.detected) {
+      mouseRef.current.set(handTrackingPos.current.x, handTrackingPos.current.y)
     }
 
     // Drain sim click queue (injected from DevPanel auto-sim)
@@ -351,9 +358,11 @@ interface QuantumCanvasProps {
   onManualClick?: (x: number, y: number) => void
   onCanvasReady?: (canvas: HTMLCanvasElement) => void
   audioBands?: MutableRefObject<{bass: number, mid: number, treble: number}>
+  handTrackingActive?: boolean
+  handTrackingPos?: MutableRefObject<{x: number, y: number, detected: boolean}>
 }
 
-export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick, onCanvasReady, audioBands }: QuantumCanvasProps) {
+export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick, onCanvasReady, audioBands, handTrackingActive, handTrackingPos }: QuantumCanvasProps) {
   return (
     <Canvas
       gl={{ antialias: false, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: true }}
@@ -362,7 +371,7 @@ export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, s
       style={{ background: '#000000', cursor: 'none' }}
       onCreated={({ gl }) => onCanvasReady?.(gl.domElement)}
     >
-      <ShaderPlane onRip={onRip} tuning={tuning} onEnergyChange={onEnergyChange} energyOverride={energyOverride} simClickQueue={simClickQueue} simMouseActive={simMouseActive} simMousePos={simMousePos} gravBodyPositions={gravBodyPositions} onZoomChange={onZoomChange} onManualClick={onManualClick} audioBands={audioBands} />
+      <ShaderPlane onRip={onRip} tuning={tuning} onEnergyChange={onEnergyChange} energyOverride={energyOverride} simClickQueue={simClickQueue} simMouseActive={simMouseActive} simMousePos={simMousePos} gravBodyPositions={gravBodyPositions} onZoomChange={onZoomChange} onManualClick={onManualClick} audioBands={audioBands} handTrackingActive={handTrackingActive} handTrackingPos={handTrackingPos} />
       <EffectComposer>
         <Bloom
           intensity={1.5}
