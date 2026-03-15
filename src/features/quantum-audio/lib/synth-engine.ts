@@ -12,6 +12,7 @@
 
 import { snapToScale } from './quantizer'
 import type { ScaleName } from './quantizer'
+import { FXChain } from './fx-chain'
 
 export type SynthWaveform = 'sine' | 'sawtooth' | 'square' | 'triangle'
 
@@ -49,6 +50,8 @@ export class SynthEngine {
   private _unisonCount = 2
   private _detuneSpread = 7 // cents total spread
   private _currentFreq = MIN_FREQ
+  private _autoDistortion = false
+  readonly fx = new FXChain()
 
   /** Current FFT band levels (read per-frame) */
   fft: FFTBands = { bass: 0, mid: 0, treble: 0 }
@@ -84,7 +87,10 @@ export class SynthEngine {
 
     const voiceGain = ctx.createGain()
     voiceGain.gain.value = 0
-    voiceGain.connect(filter)
+
+    // FX chain sits between voiceGain and filter
+    const { input: fxInput } = this.fx.connect(ctx, filter)
+    voiceGain.connect(fxInput)
 
     const voices = this.buildVoices(ctx, voiceGain, 'sine', MIN_FREQ)
 
@@ -127,6 +133,15 @@ export class SynthEngine {
   }
 
   setScale(scale: ScaleName): void { this._scale = scale }
+
+  // FX pass-through setters
+  setDelayTime(s: number): void { this.fx.setDelayTime(s) }
+  setDelayFeedback(v: number): void { this.fx.setDelayFeedback(v) }
+  setDelayMix(v: number): void { this.fx.setDelayMix(v) }
+  setReverbMix(v: number): void { this.fx.setReverbMix(v) }
+  setReverbDecay(s: number): void { this.fx.setReverbDecay(s) }
+  setDistortion(v: number): void { this.fx.setDistortion(v) }
+  setAutoDistortion(on: boolean): void { this._autoDistortion = on }
 
   setUnisonCount(count: number): void {
     const clamped = Math.max(1, Math.min(7, Math.round(count)))
@@ -175,6 +190,11 @@ export class SynthEngine {
 
     // Panning
     n.mainPanner.pan.setTargetAtTime((mouseX - 0.5) * 2.0, now, 0.1)
+
+    // Auto-distortion: interference ratio drives waveshaper
+    if (this._autoDistortion) {
+      this.fx.setDistortion(iRatio * 50)
+    }
 
     this.analyzFFT(n)
   }

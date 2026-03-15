@@ -51,6 +51,15 @@ export function useSynth() {
     getEngine().setDetuneSpread(cents)
   }, [])
 
+  // FX setters
+  const setDelayTime = useCallback((s: number) => { getEngine().setDelayTime(s) }, [])
+  const setDelayFeedback = useCallback((v: number) => { getEngine().setDelayFeedback(v) }, [])
+  const setDelayMix = useCallback((v: number) => { getEngine().setDelayMix(v) }, [])
+  const setReverbMix = useCallback((v: number) => { getEngine().setReverbMix(v) }, [])
+  const setReverbDecay = useCallback((s: number) => { getEngine().setReverbDecay(s) }, [])
+  const setDistortion = useCallback((v: number) => { getEngine().setDistortion(v) }, [])
+  const setAutoDistortion = useCallback((on: boolean) => { getEngine().setAutoDistortion(on) }, [])
+
   const update = useCallback((
     energy: number,
     maxEnergy: number,
@@ -76,6 +85,9 @@ export function useSynth() {
     start, stop, update, triggerClick, playNote,
     setWaveform, setFilterQ, setScale,
     setUnisonCount, setDetuneSpread,
+    setDelayTime, setDelayFeedback, setDelayMix,
+    setReverbMix, setReverbDecay,
+    setDistortion, setAutoDistortion,
     activeRef,
     fftRef: fftRef as MutableRefObject<FFTBands>,
   }

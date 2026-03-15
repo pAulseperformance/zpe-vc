@@ -32,6 +32,14 @@ export default function App() {
   const [synthScale, setSynthScale] = useState<ScaleName>('continuous')
   const [unisonCount, setUnisonCount] = useState(2)
   const [detuneSpread, setDetuneSpread] = useState(7)
+  // FX state
+  const [delayTime, setDelayTime] = useState(0.3)
+  const [delayFeedback, setDelayFeedback] = useState(0.4)
+  const [delayMix, setDelayMix] = useState(0)
+  const [reverbMix, setReverbMix] = useState(0)
+  const [reverbDecay, setReverbDecay] = useState(2)
+  const [distortion, setDistortion] = useState(0)
+  const [autoDistortion, setAutoDistortion] = useState(false)
 
   // Dev mode — unlocked after rip boot sequence OR always in dev
   const [devUnlocked, setDevUnlocked] = useState(IS_DEV)
@@ -187,6 +195,20 @@ export default function App() {
           onUnisonCount={(n) => { setUnisonCount(n); audio.setUnisonCount(n) }}
           detuneSpread={detuneSpread}
           onDetuneSpread={(c) => { setDetuneSpread(c); audio.setDetuneSpread(c) }}
+          delayTime={delayTime}
+          onDelayTime={(v) => { setDelayTime(v); audio.setDelayTime(v) }}
+          delayFeedback={delayFeedback}
+          onDelayFeedback={(v) => { setDelayFeedback(v); audio.setDelayFeedback(v) }}
+          delayMix={delayMix}
+          onDelayMix={(v) => { setDelayMix(v); audio.setDelayMix(v) }}
+          reverbMix={reverbMix}
+          onReverbMix={(v) => { setReverbMix(v); audio.setReverbMix(v) }}
+          reverbDecay={reverbDecay}
+          onReverbDecay={(v) => { setReverbDecay(v); audio.setReverbDecay(v) }}
+          distortion={distortion}
+          onDistortion={(v) => { setDistortion(v); audio.setDistortion(v) }}
+          autoDistortion={autoDistortion}
+          onAutoDistortion={(v) => { setAutoDistortion(v); audio.setAutoDistortion(v) }}
           fftRef={audio.fftRef}
         />
       )}

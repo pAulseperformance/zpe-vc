@@ -8,6 +8,7 @@ import { AutoSimControls } from './AutoSimControls'
 import { BarrierControls } from './BarrierControls'
 import { ExportControls } from './ExportControls'
 import { SynthControls } from './SynthControls'
+import { FXControls } from './FXControls'
 import { SliderGroup } from './SliderGroup'
 import type { SynthWaveform, FFTBands, ScaleName } from '@/features/quantum-audio'
 
@@ -46,10 +47,18 @@ interface DevPanelProps {
   onUnisonCount: (n: number) => void
   detuneSpread: number
   onDetuneSpread: (c: number) => void
+  // FX controls
+  delayTime: number; onDelayTime: (v: number) => void
+  delayFeedback: number; onDelayFeedback: (v: number) => void
+  delayMix: number; onDelayMix: (v: number) => void
+  reverbMix: number; onReverbMix: (v: number) => void
+  reverbDecay: number; onReverbDecay: (v: number) => void
+  distortion: number; onDistortion: (v: number) => void
+  autoDistortion: boolean; onAutoDistortion: (v: boolean) => void
   fftRef: MutableRefObject<FFTBands>
 }
 
-export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, hideCursor, onCursorHideChange, gravBodyPositions, canvasRef, synthWaveform, onSynthWaveform, synthFilterQ, onSynthFilterQ, audioReactive, onAudioReactive, synthScale, onSynthScale, unisonCount, onUnisonCount, detuneSpread, onDetuneSpread, fftRef }: DevPanelProps) {
+export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, hideCursor, onCursorHideChange, gravBodyPositions, canvasRef, synthWaveform, onSynthWaveform, synthFilterQ, onSynthFilterQ, audioReactive, onAudioReactive, synthScale, onSynthScale, unisonCount, onUnisonCount, detuneSpread, onDetuneSpread, delayTime, onDelayTime, delayFeedback, onDelayFeedback, delayMix, onDelayMix, reverbMix, onReverbMix, reverbDecay, onReverbDecay, distortion, onDistortion, autoDistortion, onAutoDistortion, fftRef }: DevPanelProps) {
   const [collapsed, setCollapsed] = useState(false)
   const sim = useAutoSim({ onSimClick, onSimMouseActiveChange, onSimMouseUpdate, zoomMode: tuning.zoomMode })
 
@@ -106,6 +115,7 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
       />
 
       {audioEnabled && (
+        <>
         <SynthControls
           waveform={synthWaveform}
           onWaveformChange={onSynthWaveform}
@@ -121,6 +131,16 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           onDetuneSpreadChange={onDetuneSpread}
           fftRef={fftRef}
         />
+        <FXControls
+          delayTime={delayTime} onDelayTimeChange={onDelayTime}
+          delayFeedback={delayFeedback} onDelayFeedbackChange={onDelayFeedback}
+          delayMix={delayMix} onDelayMixChange={onDelayMix}
+          reverbMix={reverbMix} onReverbMixChange={onReverbMix}
+          reverbDecay={reverbDecay} onReverbDecayChange={onReverbDecay}
+          distortion={distortion} onDistortionChange={onDistortion}
+          autoDistortion={autoDistortion} onAutoDistortionChange={onAutoDistortion}
+        />
+        </>
       )}
 
       <EnergyMeter
@@ -208,6 +228,9 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           synthScale,
           unisonCount,
           detuneSpread,
+          delayTime, delayFeedback, delayMix,
+          reverbMix, reverbDecay,
+          distortion, autoDistortion,
           hideCursor,
         }}
         onChange={(loadedTuning) => {
@@ -235,6 +258,14 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           if (loadedTuning.synthScale) onSynthScale(loadedTuning.synthScale as ScaleName)
           if (loadedTuning.unisonCount !== undefined) onUnisonCount(loadedTuning.unisonCount)
           if (loadedTuning.detuneSpread !== undefined) onDetuneSpread(loadedTuning.detuneSpread)
+          // FX
+          if (loadedTuning.delayTime !== undefined) onDelayTime(loadedTuning.delayTime)
+          if (loadedTuning.delayFeedback !== undefined) onDelayFeedback(loadedTuning.delayFeedback)
+          if (loadedTuning.delayMix !== undefined) onDelayMix(loadedTuning.delayMix)
+          if (loadedTuning.reverbMix !== undefined) onReverbMix(loadedTuning.reverbMix)
+          if (loadedTuning.reverbDecay !== undefined) onReverbDecay(loadedTuning.reverbDecay)
+          if (loadedTuning.distortion !== undefined) onDistortion(loadedTuning.distortion)
+          if (loadedTuning.autoDistortion !== undefined) onAutoDistortion(loadedTuning.autoDistortion)
           if (loadedTuning.hideCursor !== undefined) onCursorHideChange(loadedTuning.hideCursor)
         }}
         canvasRef={canvasRef}

@@ -55,6 +55,14 @@ export interface ShaderTuning {
   synthScale?: string   // Scale quantizer: 'continuous' | 'minor-pentatonic' | etc.
   unisonCount?: number  // 1-7 oscillators per voice
   detuneSpread?: number // Cents of detune spread across unison voices
+  // FX
+  delayTime?: number    // 0-1 seconds
+  delayFeedback?: number // 0-0.95
+  delayMix?: number     // 0-1 wet/dry
+  reverbMix?: number    // 0-1 wet/dry
+  reverbDecay?: number  // 0.5-5 seconds
+  distortion?: number   // 0-100 drive
+  autoDistortion?: boolean
   // UI
   hideCursor?: boolean
 }
@@ -106,6 +114,13 @@ export const DEFAULT_TUNING: ShaderTuning = {
   synthScale: 'continuous',
   unisonCount: 2,
   detuneSpread: 7,
+  delayTime: 0.3,
+  delayFeedback: 0.4,
+  delayMix: 0,
+  reverbMix: 0,
+  reverbDecay: 2,
+  distortion: 0,
+  autoDistortion: false,
   // UI defaults
   hideCursor: true,
 }
