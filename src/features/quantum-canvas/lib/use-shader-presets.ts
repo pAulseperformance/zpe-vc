@@ -4,8 +4,10 @@ import { BUILT_IN_PRESETS, DEFAULT_TUNING } from './shader-tuning'
 
 const STORAGE_KEY = 'zpe-shader-presets-v2'
 const ACTIVE_KEY = 'zpe-shader-active-v2'
+const THUMBNAIL_KEY = 'zpe-shader-thumbnails-v1'
 
 export type PresetMap = Record<string, ShaderTuning>
+export type ThumbnailMap = Record<string, string>
 
 function loadPresets(): PresetMap {
   const presets: PresetMap = {}
@@ -84,5 +86,21 @@ export function useShaderPresets() {
 
   const names = Object.keys(presets)
 
-  return { presets, names, save, load, remove }
+  // ── Thumbnails ──
+  const [thumbnails, setThumbnails] = useState<ThumbnailMap>(() => {
+    try {
+      const raw = localStorage.getItem(THUMBNAIL_KEY)
+      return raw ? JSON.parse(raw) as ThumbnailMap : {}
+    } catch { return {} }
+  })
+
+  const saveThumbnail = (name: string, dataUrl: string) => {
+    const updated = { ...thumbnails, [name]: dataUrl }
+    setThumbnails(updated)
+    localStorage.setItem(THUMBNAIL_KEY, JSON.stringify(updated))
+  }
+
+  const getThumbnail = (name: string): string | undefined => thumbnails[name]
+
+  return { presets, names, save, load, remove, thumbnails, saveThumbnail, getThumbnail }
 }

@@ -32,7 +32,7 @@ export interface ShaderTuning {
   // Preset Metadata (not sent to shader)
   autoSim?: {
     active: boolean
-    mode: 'single' | 'dual' | 'gravity' | 'cluster'
+    mode: 'single' | 'dual' | 'gravity' | 'cluster' | 'random' | 'spiral'
     rate: number
     clicksOn?: boolean
     mouseOn?: boolean

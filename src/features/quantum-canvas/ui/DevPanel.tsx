@@ -6,6 +6,7 @@ import type { ShaderTuning } from '../lib/shader-tuning'
 import { PresetControls } from './PresetControls'
 import { AutoSimControls } from './AutoSimControls'
 import { BarrierControls } from './BarrierControls'
+import { ExportControls } from './ExportControls'
 import { SliderGroup } from './SliderGroup'
 
 export type { ShaderTuning }
@@ -29,9 +30,10 @@ interface DevPanelProps {
   hideCursor: boolean
   onCursorHideChange: (value: boolean) => void
   gravBodyPositions: MutableRefObject<{click: {x: number, y: number}, mouse: {x: number, y: number}} | null>
+  canvasRef: MutableRefObject<HTMLCanvasElement | null>
 }
 
-export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, hideCursor, onCursorHideChange, gravBodyPositions }: DevPanelProps) {
+export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, hideCursor, onCursorHideChange, gravBodyPositions, canvasRef }: DevPanelProps) {
   const [collapsed, setCollapsed] = useState(false)
   const sim = useAutoSim({ onSimClick, onSimMouseActiveChange, onSimMouseUpdate, zoomMode: tuning.zoomMode })
 
@@ -178,7 +180,9 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
             onWallRipChange(loadedTuning.ripBlocked)
           }
         }}
+        canvasRef={canvasRef}
       />
+      <ExportControls canvasRef={canvasRef} />
       <BarrierControls tuning={tuning} onChange={onChange} />
       <AutoSimControls sim={sim} />
 

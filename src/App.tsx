@@ -22,6 +22,7 @@ export default function App() {
   const [hideCursor, setHideCursor] = useState(true)
   const audio = useQuantumAudio()
   const gravBodyPositionsRef = useRef<{click: {x: number, y: number}, mouse: {x: number, y: number}} | null>(null)
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
   // Dev mode — unlocked after rip boot sequence OR always in dev
   const [devUnlocked, setDevUnlocked] = useState(IS_DEV)
@@ -96,6 +97,7 @@ export default function App() {
             gravBodyPositions={gravBodyPositionsRef}
             onZoomChange={handleZoomChange}
             onManualClick={(x, _y) => audio.triggerClick(x)}
+            onCanvasReady={(c) => { canvasRef.current = c }}
           />
         </Suspense>
       </motion.div>
@@ -133,6 +135,7 @@ export default function App() {
           hideCursor={hideCursor}
           onCursorHideChange={setHideCursor}
           gravBodyPositions={gravBodyPositionsRef}
+          canvasRef={canvasRef}
         />
       )}
     </div>

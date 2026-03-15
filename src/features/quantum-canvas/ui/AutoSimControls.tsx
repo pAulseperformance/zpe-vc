@@ -57,10 +57,14 @@ export function AutoSimControls({ sim }: AutoSimControlsProps) {
             <div className="flex items-center gap-2">
               <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Mode</span>
               <button
-                onClick={() => setSimMode(simMode === 'single' ? 'dual' : simMode === 'dual' ? 'cluster' : simMode === 'cluster' ? 'gravity' : 'single')}
+                onClick={() => {
+                  const modes = ['single', 'dual', 'cluster', 'gravity', 'random', 'spiral'] as const
+                  const idx = modes.indexOf(simMode)
+                  setSimMode(modes[(idx + 1) % modes.length])
+                }}
                 className="text-[0.55rem] text-cold-white-dim/50 hover:text-electric-purple border border-cold-white-dim/10 rounded px-2 py-0.5"
               >
-                {simMode === 'single' ? '● Single Origin' : simMode === 'dual' ? '●● Dual Origins' : simMode === 'cluster' ? '✨ Cluster' : '🌀 Gravity Orbit'}
+                {simMode === 'single' ? '● Single Origin' : simMode === 'dual' ? '●● Dual Origins' : simMode === 'cluster' ? '✨ Cluster' : simMode === 'gravity' ? '🌀 Gravity Orbit' : simMode === 'random' ? '🎲 Random Walk' : '🌀 Spiral'}
               </button>
             </div>
             <div className="flex items-center gap-2">

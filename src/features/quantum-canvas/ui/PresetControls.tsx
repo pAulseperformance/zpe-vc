@@ -6,17 +6,36 @@ import { useShaderPresets } from '../lib/use-shader-presets'
 interface PresetControlsProps {
   tuning: ShaderTuning
   onChange: (tuning: ShaderTuning) => void
+  canvasRef: React.MutableRefObject<HTMLCanvasElement | null>
 }
 
-export function PresetControls({ tuning, onChange }: PresetControlsProps) {
-  const { names, save, load, remove } = useShaderPresets()
+export function PresetControls({ tuning, onChange, canvasRef }: PresetControlsProps) {
+  const { names, save, load, remove, saveThumbnail, getThumbnail } = useShaderPresets()
   const [presetName, setPresetName] = useState('')
   const [importStatus, setImportStatus] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const captureThumb = (): string | null => {
+    const canvas = canvasRef.current
+    if (!canvas) return null
+    try {
+      const w = 120
+      const h = 68
+      const offscreen = document.createElement('canvas')
+      offscreen.width = w
+      offscreen.height = h
+      const ctx = offscreen.getContext('2d')
+      if (!ctx) return null
+      ctx.drawImage(canvas, 0, 0, w, h)
+      return offscreen.toDataURL('image/webp', 0.6)
+    } catch { return null }
+  }
+
   const handleSave = () => {
     const name = presetName.trim() || `preset-${Date.now()}`
     save(name, tuning)
+    const thumb = captureThumb()
+    if (thumb) saveThumbnail(name, thumb)
     setPresetName('')
   }
 
@@ -102,26 +121,34 @@ export function PresetControls({ tuning, onChange }: PresetControlsProps) {
 
       {/* Preset list */}
       {names.length > 0 && (
-        <div className="mt-2 space-y-1 max-h-24 overflow-y-auto">
-          {names.map(name => (
-            <div key={name} className="flex items-center justify-between group py-1 border-b border-cold-white-dim/5 last:border-0 pl-1">
-              <button
-                onClick={() => handleLoad(name)}
-                className="text-[0.55rem] text-cold-white-dim/50 hover:text-cold-white truncate flex-1 text-left"
-              >
-                ▸ {name}
-              </button>
-              {BUILT_IN_PRESETS[name] === undefined && (
+        <div className="mt-2 space-y-1 max-h-40 overflow-y-auto">
+          {names.map(name => {
+            const thumb = getThumbnail(name)
+            return (
+              <div key={name} className="flex items-center gap-2 group py-1 border-b border-cold-white-dim/5 last:border-0 pl-1">
+                {thumb ? (
+                  <img src={thumb} alt={name} className="w-[30px] h-[17px] rounded-sm object-cover opacity-70 group-hover:opacity-100 transition-opacity" />
+                ) : (
+                  <div className="w-[30px] h-[17px] rounded-sm bg-gradient-to-br from-electric-purple/20 to-cold-white-dim/10" />
+                )}
                 <button
-                  onClick={() => remove(name)}
-                  className="text-[0.6rem] text-cold-white-dim/30 hover:text-red-400 px-2 py-0.5 rounded hover:bg-red-400/10 transition-colors ml-2"
-                  title="Delete preset"
+                  onClick={() => handleLoad(name)}
+                  className="text-[0.55rem] text-cold-white-dim/50 hover:text-cold-white truncate flex-1 text-left"
                 >
-                  ×
+                  {name}
                 </button>
-              )}
-            </div>
-          ))}
+                {BUILT_IN_PRESETS[name] === undefined && (
+                  <button
+                    onClick={() => remove(name)}
+                    className="text-[0.6rem] text-cold-white-dim/30 hover:text-red-400 px-2 py-0.5 rounded hover:bg-red-400/10 transition-colors ml-2"
+                    title="Delete preset"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

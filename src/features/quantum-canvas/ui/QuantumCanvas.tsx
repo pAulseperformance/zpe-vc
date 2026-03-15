@@ -332,15 +332,17 @@ interface QuantumCanvasProps {
   gravBodyPositions: MutableRefObject<{click: {x: number, y: number}, mouse: {x: number, y: number}} | null>
   onZoomChange: (delta: number) => void
   onManualClick?: (x: number, y: number) => void
+  onCanvasReady?: (canvas: HTMLCanvasElement) => void
 }
 
-export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick }: QuantumCanvasProps) {
+export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick, onCanvasReady }: QuantumCanvasProps) {
   return (
     <Canvas
-      gl={{ antialias: false, alpha: false, powerPreference: 'high-performance' }}
+      gl={{ antialias: false, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: true }}
       camera={{ position: [0, 0, 1] }}
       dpr={[1, 1.5]}
       style={{ background: '#000000', cursor: 'none' }}
+      onCreated={({ gl }) => onCanvasReady?.(gl.domElement)}
     >
       <ShaderPlane onRip={onRip} tuning={tuning} onEnergyChange={onEnergyChange} energyOverride={energyOverride} simClickQueue={simClickQueue} simMouseActive={simMouseActive} simMousePos={simMousePos} gravBodyPositions={gravBodyPositions} onZoomChange={onZoomChange} onManualClick={onManualClick} />
       <EffectComposer>

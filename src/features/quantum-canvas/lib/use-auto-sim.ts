@@ -19,7 +19,7 @@ export function useAutoSim(callbacks: AutoSimCallbacks) {
   const [simClicksOn, setSimClicksOn] = useState(true)
   const [simMouseOn, setSimMouseOn] = useState(false)
   const [simRate, setSimRate] = useState(2)
-  const [simMode, setSimMode] = useState<'single' | 'dual' | 'cluster' | 'gravity'>('single')
+  const [simMode, setSimMode] = useState<'single' | 'dual' | 'cluster' | 'gravity' | 'random' | 'spiral'>('single')
   const [simSeparation, setSimSeparation] = useState(0.2)
   const [simMouseSpeed, setSimMouseSpeed] = useState(0.5)
   const [simMouseRadius, setSimMouseRadius] = useState(0.15)
@@ -111,6 +111,21 @@ export function useAutoSim(callbacks: AutoSimCallbacks) {
           grav.mousePos.y += grav.mouseVel.y * dt * st.simMouseSpeed
           
           onSimMouseUpdate(grav.mousePos.x, grav.mousePos.y)
+        } else if (st.simMode === 'random') {
+          // Organic random walk using layered sine waves (poor man's Perlin)
+          const t = Date.now() * 0.001 * st.simMouseSpeed
+          const x = 0.5 + Math.sin(t * 0.7) * 0.15 + Math.sin(t * 1.3) * 0.08 + Math.sin(t * 2.9) * 0.04
+          const y = 0.5 + Math.cos(t * 0.5) * 0.15 + Math.cos(t * 1.7) * 0.08 + Math.cos(t * 3.1) * 0.04
+          onSimMouseUpdate(Math.max(0.05, Math.min(0.95, x)), Math.max(0.05, Math.min(0.95, y)))
+        } else if (st.simMode === 'spiral') {
+          // Archimedean spiral expanding outward then snapping back
+          const t = Date.now() * 0.001 * st.simMouseSpeed
+          const cycle = t % 8 // 8-second cycle
+          const r = (cycle / 8) * st.simMouseRadius * 2
+          const theta = cycle * 3 // 3 radians per second
+          const x = 0.5 + Math.cos(theta) * r
+          const y = 0.5 + Math.sin(theta) * r
+          onSimMouseUpdate(Math.max(0.02, Math.min(0.98, x)), Math.max(0.02, Math.min(0.98, y)))
         } else {
           // Lissajous
           const t = Date.now() * 0.001 * st.simMouseSpeed
@@ -175,6 +190,20 @@ export function useAutoSim(callbacks: AutoSimCallbacks) {
             }
           } else if (st.simMode === 'gravity') {
             onSimClick(grav.clickPos.x, grav.clickPos.y)
+          } else if (st.simMode === 'random') {
+            // Click at the wandering mouse position
+            const t = Date.now() * 0.001 * st.simMouseSpeed
+            const x = 0.5 + Math.sin(t * 0.7) * 0.15 + Math.sin(t * 1.3) * 0.08 + Math.sin(t * 2.9) * 0.04
+            const y = 0.5 + Math.cos(t * 0.5) * 0.15 + Math.cos(t * 1.7) * 0.08 + Math.cos(t * 3.1) * 0.04
+            onSimClick(Math.max(0.05, Math.min(0.95, x)), Math.max(0.05, Math.min(0.95, y)))
+          } else if (st.simMode === 'spiral') {
+            const t = Date.now() * 0.001 * st.simMouseSpeed
+            const cycle = t % 8
+            const r = (cycle / 8) * st.simMouseRadius * 2
+            const theta = cycle * 3
+            const x = 0.5 + Math.cos(theta) * r
+            const y = 0.5 + Math.sin(theta) * r
+            onSimClick(Math.max(0.02, Math.min(0.98, x)), Math.max(0.02, Math.min(0.98, y)))
           }
         }
       }
