@@ -51,35 +51,85 @@ float hash(vec2 p) {
   return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
 }
 
+// FBM — multi-octave turbulence
+float fbm(vec2 p, int octaves) {
+  float value = 0.0;
+  float amp = 0.5;
+  float freq = 1.0;
+  for (int i = 0; i < 6; i++) {
+    if (i >= octaves) break;
+    value += amp * snoise(p * freq);
+    freq *= 2.0;
+    amp *= 0.5;
+  }
+  return value;
+}
+
 // ═══════════════════════════════════════════════════════════
-// STATE 1: Quantum Jitter — subtle purple glow + tiny particle pops
-// Reference: faint purple radial nebula, barely-there sparkles
+// STATE 1: Quantum Jitter — dark, ethereal boiling quantum vacuum
+// Zero-point energy: restless churning foam of virtual particles
 // ═══════════════════════════════════════════════════════════
 vec3 quantumJitter(vec2 uv, float t) {
   vec2 c = uv - 0.5;
   float dist = length(c);
 
-  // Soft radial purple glow — very subtle, center-weighted
-  float glow = exp(-dist * dist * 8.0) * 0.15;
-  vec3 color = VOID + PURPLE * glow;
+  // ── Domain-warped FBM: the "boiling soup" ──
+  // Feed noise into noise for organic, churning turbulence
+  float slow = t * 0.06;
+  float mid  = t * 0.12;
 
-  // Barely-visible nebula texture
-  float n1 = snoise(uv * 4.0 + t * 0.08) * 0.5 + 0.5;
-  float n2 = snoise(uv * 8.0 - t * 0.12) * 0.5 + 0.5;
-  float nebula = n1 * n2;
-  color += DEEP_PURP * nebula * exp(-dist * dist * 6.0) * 0.12;
+  // First warp layer — large-scale flow direction
+  vec2 warp1 = vec2(
+    fbm(uv * 3.0 + vec2(slow, -slow * 0.7), 4),
+    fbm(uv * 3.0 + vec2(-slow * 0.8, slow * 1.1), 4)
+  );
 
-  // Microscopic particle pops — tiny, sparse, flickering
-  float sparkle = snoise(uv * 80.0 + t * 2.0);
-  float pop = smoothstep(0.82, 0.85, sparkle);
-  pop *= exp(-dist * dist * 5.0);  // Center-weighted
-  color += WHITE * pop * 0.25;
+  // Second warp — feed first warp back in (creates organic churn)
+  vec2 warp2 = vec2(
+    fbm(uv * 3.0 + warp1 * 1.5 + vec2(mid * 0.3, mid), 4),
+    fbm(uv * 3.0 + warp1 * 1.5 + vec2(-mid, mid * 0.5), 4)
+  );
 
-  // Even tinier secondary particles
-  float sparkle2 = snoise(uv * 120.0 - t * 3.0);
-  float pop2 = smoothstep(0.88, 0.90, sparkle2);
-  pop2 *= exp(-dist * dist * 4.0);
-  color += mix(PURPLE, WHITE, 0.5) * pop2 * 0.15;
+  // Final turbulence field — the boiling texture
+  float boil = fbm(uv * 4.0 + warp2 * 1.2, 5);
+  boil = boil * 0.5 + 0.5; // Remap to 0..1
+
+  // ── Color the boiling soup ──
+  vec3 color = VOID;
+
+  // Deep purple undulation — the primary churning layer
+  float purpleIntensity = boil * exp(-dist * dist * 3.5) * 0.22;
+  color += DEEP_PURP * purpleIntensity;
+
+  // Brighter purple in the bubble peaks
+  float peaks = smoothstep(0.55, 0.75, boil) * exp(-dist * dist * 4.0);
+  color += PURPLE * peaks * 0.18;
+
+  // Cosmic blue in the troughs — creates depth between bubbles
+  float troughs = smoothstep(0.5, 0.3, boil) * exp(-dist * dist * 5.0);
+  color += BLUE * troughs * 0.10;
+
+  // Subtle center glow — the heart of the quantum foam
+  color += PURPLE * exp(-dist * dist * 12.0) * 0.08;
+
+  // ── Virtual particle pops — secondary to the churning ──
+  // Tiny sparkles that appear at the peaks of turbulence
+  float sparkle = snoise(uv * 60.0 + t * 1.8);
+  float pop = smoothstep(0.80, 0.84, sparkle) * smoothstep(0.50, 0.60, boil);
+  pop *= exp(-dist * dist * 4.0);
+  color += WHITE * pop * 0.20;
+
+  // Even tinier purple-white flickers
+  float sparkle2 = snoise(uv * 100.0 - t * 2.5);
+  float pop2 = smoothstep(0.86, 0.89, sparkle2);
+  pop2 *= exp(-dist * dist * 3.5);
+  color += mix(PURPLE, WHITE, 0.6) * pop2 * 0.10;
+
+  // ── Faint energy arcs — ephemeral connections ──
+  float arc = abs(snoise(uv * 12.0 + warp1 * 2.0 + t * 0.15));
+  float arcLine = smoothstep(0.45, 0.48, arc) * (1.0 - smoothstep(0.48, 0.51, arc));
+  arcLine *= exp(-dist * dist * 3.0) * 0.06;
+  color += WHITE * arcLine;
 
   return color;
 }
