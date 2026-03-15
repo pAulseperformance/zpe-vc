@@ -240,46 +240,72 @@ export class SynthEngine {
     this.fireNoiseBurst(n, mapX, 0.04, 0.08)
   }
 
-  playNote(freq: number, velocity = 0.8): void {
+  /**
+   * Play a note. If sustained=true, holds at sustain level until release() is called.
+   * If sustained=false (default), auto-releases after attack+decay.
+   */
+  playNote(freq: number, velocity = 0.8, sustained = false): { release: () => void } {
+    const noop = { release: () => {} }
     const n = this.nodes
-    if (!n || !this._active) return
+    if (!n || !this._active) return noop
 
-    const now = n.ctx.currentTime
-    const noteFilter = n.ctx.createBiquadFilter()
+    const ctx = n.ctx
+    const now = ctx.currentTime
+    const noteFilter = ctx.createBiquadFilter()
     noteFilter.type = 'lowpass'
     noteFilter.frequency.value = n.filter.frequency.value
     noteFilter.Q.value = n.filter.Q.value
 
-    const gain = n.ctx.createGain()
+    const gain = ctx.createGain()
     const vol = velocity * 0.2
     const { attack, decay, sustain, release } = this._envelope
-    const totalDuration = attack + decay + release + 0.05
 
+    // Attack → Decay → Sustain level
     gain.gain.setValueAtTime(0, now)
     gain.gain.linearRampToValueAtTime(vol, now + attack)
     gain.gain.linearRampToValueAtTime(vol * sustain, now + attack + decay)
-    gain.gain.setValueAtTime(vol * sustain, now + attack + decay + 0.05)
-    gain.gain.linearRampToValueAtTime(0, now + totalDuration)
 
     // Spawn unison voices for this note
     const count = this._unisonCount
+    const oscs: OscillatorNode[] = []
     for (let i = 0; i < count; i++) {
-      const osc = n.ctx.createOscillator()
+      const osc = ctx.createOscillator()
       osc.type = n.waveform
       osc.frequency.value = freq
       osc.detune.value = this.detuneForIndex(i, count)
 
-      const vPan = n.ctx.createStereoPanner()
+      const vPan = ctx.createStereoPanner()
       vPan.pan.value = this.panForIndex(i, count)
 
       osc.connect(vPan)
       vPan.connect(noteFilter)
       osc.start(now)
-      osc.stop(now + totalDuration + 0.05)
+      oscs.push(osc)
     }
 
     noteFilter.connect(gain)
     gain.connect(n.analyser)
+
+    let released = false
+    const doRelease = () => {
+      if (released) return
+      released = true
+      const t = ctx.currentTime
+      gain.gain.cancelScheduledValues(t)
+      gain.gain.setValueAtTime(gain.gain.value, t)
+      gain.gain.linearRampToValueAtTime(0, t + release)
+      oscs.forEach(o => { try { o.stop(t + release + 0.05) } catch { /* already stopped */ } })
+    }
+
+    if (!sustained) {
+      // Auto-release after attack + decay + small hold
+      const autoReleaseTime = now + attack + decay + 0.05
+      gain.gain.setValueAtTime(vol * sustain, autoReleaseTime)
+      gain.gain.linearRampToValueAtTime(0, autoReleaseTime + release)
+      oscs.forEach(o => { try { o.stop(autoReleaseTime + release + 0.05) } catch { /* */ } })
+    }
+
+    return { release: doRelease }
   }
 
   // ── Internal: Voice Management ─────────────────────────

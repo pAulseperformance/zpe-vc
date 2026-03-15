@@ -80,8 +80,8 @@ export function useSynth() {
     getEngine().triggerClick(mapX)
   }, [])
 
-  const playNote = useCallback((freq: number, velocity?: number) => {
-    getEngine().playNote(freq, velocity)
+  const playNote = useCallback((freq: number, velocity?: number, sustained?: boolean) => {
+    return getEngine().playNote(freq, velocity, sustained)
   }, [])
 
   return {

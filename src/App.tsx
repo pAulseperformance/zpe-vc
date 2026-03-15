@@ -78,19 +78,42 @@ export default function App() {
       q: 523.25, w: 554.37, e: 587.33, r: 622.25, t: 659.26, y: 698.46, u: 739.99, i: 783.99, o: 830.61, p: 880.00,
     }
 
+    // Track active held notes for polyphonic sustain
+    const activeNotes = new Map<string, { release: () => void }>()
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.repeat) return
-      const freq = keyMap[e.key.toLowerCase()]
+      const key = e.key.toLowerCase()
+      const freq = keyMap[key]
       if (freq) {
-        audio.playNote(freq)
+        // Release any existing note on this key (shouldn't happen, but safety)
+        activeNotes.get(key)?.release()
+        const handle = audio.playNote(freq, 0.8, true) // sustained=true
+        activeNotes.set(key, handle)
         // Spawn a catalyst at a position mapped to the key's pitch
         const pitchNorm = (Math.log2(freq) - Math.log2(130.81)) / (Math.log2(880) - Math.log2(130.81))
         simClickQueueRef.current.push({ x: 0.1 + pitchNorm * 0.8, y: 0.3 + Math.random() * 0.4 })
       }
     }
 
+    const handleKeyUp = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase()
+      const handle = activeNotes.get(key)
+      if (handle) {
+        handle.release()
+        activeNotes.delete(key)
+      }
+    }
+
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+      // Release all active notes on cleanup
+      activeNotes.forEach(h => h.release())
+      activeNotes.clear()
+    }
   }, [audioEnabled, audio, simClickQueueRef])
 
   const onRip = useCallback(() => {
