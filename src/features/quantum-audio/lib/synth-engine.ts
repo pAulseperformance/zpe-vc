@@ -210,8 +210,7 @@ export class SynthEngine {
 
     // Pitch: mouse Y → C2-C5 (exponential), quantized to scale
     if (mouseY !== undefined) {
-      const yInv = 1.0 - mouseY
-      const rawFreq = MIN_FREQ * Math.pow(MAX_FREQ / MIN_FREQ, yInv)
+      const rawFreq = MIN_FREQ * Math.pow(MAX_FREQ / MIN_FREQ, mouseY)
       const freq = snapToScale(rawFreq, this._scale)
       this._currentFreq = freq
       for (const v of n.voices) {
