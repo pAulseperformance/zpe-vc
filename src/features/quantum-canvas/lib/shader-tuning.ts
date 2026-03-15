@@ -32,14 +32,14 @@ export interface ShaderTuning {
 }
 
 export const DEFAULT_TUNING: ShaderTuning = {
-  waveSpeed: 1.2,
+  waveSpeed: 1,
   waveFreq: 150,
   waveWidth: 0.1,
   emDamping: 1.6,
   gravDamping: 1.6,
   waveLifetime: 15,
-  maxWaves: 30,
-  lenzStrength: 0.08,
+  maxWaves: 10,
+  lenzStrength: 0.12,
   lenzWake: 0.6,
   hoverRadius: 0.05,
   energyDecay: 30,
@@ -49,8 +49,8 @@ export const DEFAULT_TUNING: ShaderTuning = {
   parallaxDepth: 0,
   heatDecay: 0.2,
   heatAttack: 0.65,
-  heatIntensity: 0.55,
-  interferenceBlend: 0.55,
+  heatIntensity: 1,
+  interferenceBlend: 0,
   iridescence: 0.6,
   paletteMode: 0,   // Default: physical
   starField: 0,
