@@ -24,7 +24,7 @@ interface Catalyst {
 interface ShaderPlaneProps {
   onRip: () => void
   tuning: ShaderTuning
-  onEnergyChange: (energy: number, interferenceRatio: number, mouseX: number) => void
+  onEnergyChange: (energy: number, interferenceRatio: number, mouseX: number, mouseY: number) => void
   energyOverride: number | null
   simClickQueue: MutableRefObject<Array<{x: number, y: number}>>
   simMouseActive: boolean
@@ -32,9 +32,10 @@ interface ShaderPlaneProps {
   gravBodyPositions: MutableRefObject<{click: {x: number, y: number}, mouse: {x: number, y: number}} | null>
   onZoomChange: (delta: number) => void
   onManualClick?: (x: number, y: number) => void
+  audioBands?: MutableRefObject<{bass: number, mid: number, treble: number}>
 }
 
-function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick }: ShaderPlaneProps) {
+function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick, audioBands }: ShaderPlaneProps) {
   const meshRef = useRef<THREE.Mesh>(null)
   const { size } = useThree()
 
@@ -91,6 +92,10 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
       uHoverWarp: { value: tuning.hoverWarp ?? 0.1 },
       uSpinSpeed: { value: tuning.spinSpeed ?? 1.0 },
       uViewScale: { value: tuning.viewScale ?? 1.0 },
+      // Audio-reactive FFT bands
+      uAudioBass: { value: 0 },
+      uAudioMid: { value: 0 },
+      uAudioTreble: { value: 0 },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
@@ -195,7 +200,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
     )
 
     // Report energy + interference to parent
-    onEnergyChange(effectiveEnergy, interferenceRatio, mouseRef.current.x)
+    onEnergyChange(effectiveEnergy, interferenceRatio, mouseRef.current.x, mouseRef.current.y)
 
     if (energyRef.current >= t.ripThreshold && !hasRippedRef.current) {
       hasRippedRef.current = true
@@ -266,6 +271,18 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
     mat.uniforms.uSpinSpeed.value = t.spinSpeed ?? 1.0
     mat.uniforms.uViewScale.value = t.viewScale ?? 1.0
 
+    // ── Audio-Reactive FFT Modulation ──
+    // Bass → heat pulse + wider waves | Mid → interference shimmer + iridescence | Treble → starfield + spin
+    if (audioBands?.current) {
+      const b = audioBands.current
+      mat.uniforms.uHeatIntensity.value *= (1.0 + b.bass * 2.0)
+      mat.uniforms.uWaveWidth.value *= (1.0 + b.bass * 0.5)
+      mat.uniforms.uInterferenceBlend.value *= (1.0 + b.mid * 1.5)
+      mat.uniforms.uIridescence.value *= (1.0 + b.mid * 0.8)
+      mat.uniforms.uStarField.value = Math.max(mat.uniforms.uStarField.value, b.treble * 0.5)
+      mat.uniforms.uSpinSpeed.value *= (1.0 + b.treble * 0.5)
+    }
+
     // ── Adaptive Zoom ──
     let targetScale = t.viewScale ?? 1.0
     if ((t.zoomMode ?? 0) >= 1) {
@@ -324,7 +341,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
 interface QuantumCanvasProps {
   onRip: () => void
   tuning: ShaderTuning
-  onEnergyChange: (energy: number, interferenceRatio: number, mouseX: number) => void
+  onEnergyChange: (energy: number, interferenceRatio: number, mouseX: number, mouseY: number) => void
   energyOverride: number | null
   simClickQueue: MutableRefObject<Array<{x: number, y: number}>>
   simMouseActive: boolean
@@ -333,9 +350,10 @@ interface QuantumCanvasProps {
   onZoomChange: (delta: number) => void
   onManualClick?: (x: number, y: number) => void
   onCanvasReady?: (canvas: HTMLCanvasElement) => void
+  audioBands?: MutableRefObject<{bass: number, mid: number, treble: number}>
 }
 
-export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick, onCanvasReady }: QuantumCanvasProps) {
+export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick, onCanvasReady, audioBands }: QuantumCanvasProps) {
   return (
     <Canvas
       gl={{ antialias: false, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: true }}
@@ -344,7 +362,7 @@ export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, s
       style={{ background: '#000000', cursor: 'none' }}
       onCreated={({ gl }) => onCanvasReady?.(gl.domElement)}
     >
-      <ShaderPlane onRip={onRip} tuning={tuning} onEnergyChange={onEnergyChange} energyOverride={energyOverride} simClickQueue={simClickQueue} simMouseActive={simMouseActive} simMousePos={simMousePos} gravBodyPositions={gravBodyPositions} onZoomChange={onZoomChange} onManualClick={onManualClick} />
+      <ShaderPlane onRip={onRip} tuning={tuning} onEnergyChange={onEnergyChange} energyOverride={energyOverride} simClickQueue={simClickQueue} simMouseActive={simMouseActive} simMousePos={simMousePos} gravBodyPositions={gravBodyPositions} onZoomChange={onZoomChange} onManualClick={onManualClick} audioBands={audioBands} />
       <EffectComposer>
         <Bloom
           intensity={1.5}

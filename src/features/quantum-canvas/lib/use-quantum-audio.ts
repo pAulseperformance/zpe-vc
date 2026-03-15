@@ -1,91 +1,113 @@
 import { useRef, useCallback } from 'react'
 
 /**
- * Quantum Audio Engine — WebAudio feedback tied to shader state
+ * Quantum Synth Engine — DSP synthesizer with FFT analysis
  *
- * Uses 3 oscillator layers:
- * 1. Base drone: low sine tied to energy level (pitch rises with energy)
- * 2. Harmonic shimmer: higher oscillator modulated by interference pattern
- * 3. Click transient: short burst when catalyst is added
+ * Signal chain:
+ *   OscA (detuned +7¢) ─┐
+ *                        ├→ Filter (lowpass) → Panner → AnalyserNode → MasterGain → Destination
+ *   OscB (detuned -7¢) ─┘
  *
- * All volumes are energy-gated: silence when energy = 0
+ * Mouse Y → pitch (C2-C5 exponential)
+ * Mouse X → filter cutoff (200Hz-8kHz)
+ * FFT → bass/mid/treble bands exported per-frame
  */
 
-interface AudioState {
+export type SynthWaveform = 'sine' | 'sawtooth' | 'square' | 'triangle'
+
+interface SynthState {
   ctx: AudioContext
   masterGain: GainNode
-  mainPanner: StereoPannerNode // Continuous panning for drone/shimmer based on mouse
-  // Layer 1: base drone
-  droneOsc: OscillatorNode
-  droneGain: GainNode
-  // Layer 2: harmonic shimmer
-  shimmerOsc: OscillatorNode
-  shimmerGain: GainNode
-  // Layer 3: sub-bass pulse
-  subOsc: OscillatorNode
-  subGain: GainNode
+  mainPanner: StereoPannerNode
+  // Dual-voice oscillator bank
+  oscA: OscillatorNode
+  oscB: OscillatorNode
+  voiceGain: GainNode
+  // Lowpass filter
+  filter: BiquadFilterNode
+  // FFT analysis
+  analyser: AnalyserNode
+  fftData: Uint8Array<ArrayBuffer>
+  // Current waveform
+  waveform: SynthWaveform
 }
 
-const BASE_FREQ = 55 // A1 — low drone fundamental
-const MAX_DRONE_FREQ = 220 // A3 — max drone frequency at full energy
-const SHIMMER_RATIO = 3.01 // Slightly detuned 3rd harmonic for beating
+export interface FFTBands {
+  bass: number   // 0-1
+  mid: number    // 0-1
+  treble: number // 0-1
+}
+
+const MIN_FREQ = 65    // C2
+const MAX_FREQ = 523   // C5
+const DETUNE_CENTS = 7
 
 export function useQuantumAudio() {
-  const audioRef = useRef<AudioState | null>(null)
+  const audioRef = useRef<SynthState | null>(null)
   const activeRef = useRef(false)
+  const fftRef = useRef<FFTBands>({ bass: 0, mid: 0, treble: 0 })
+  const smoothRef = useRef<FFTBands>({ bass: 0, mid: 0, treble: 0 })
 
   const start = useCallback(() => {
     if (audioRef.current) return
 
     const ctx = new AudioContext()
+
+    // Master output
     const masterGain = ctx.createGain()
     masterGain.gain.value = 0
     masterGain.connect(ctx.destination)
 
+    // FFT analyzer (sits between synth and master)
+    const analyser = ctx.createAnalyser()
+    analyser.fftSize = 256
+    analyser.smoothingTimeConstant = 0.6
+    analyser.connect(masterGain)
+    const fftData = new Uint8Array(analyser.frequencyBinCount) // 128 bins
+
+    // Stereo panner
     const mainPanner = ctx.createStereoPanner()
     mainPanner.pan.value = 0
-    mainPanner.connect(masterGain)
+    mainPanner.connect(analyser)
 
-    // Layer 1: base drone (sine)
-    const droneOsc = ctx.createOscillator()
-    const droneGain = ctx.createGain()
-    droneOsc.type = 'sine'
-    droneOsc.frequency.value = BASE_FREQ
-    droneGain.gain.value = 0
-    droneOsc.connect(droneGain)
-    droneGain.connect(mainPanner)
-    droneOsc.start()
+    // Lowpass filter
+    const filter = ctx.createBiquadFilter()
+    filter.type = 'lowpass'
+    filter.frequency.value = 2000
+    filter.Q.value = 2.0
+    filter.connect(mainPanner)
 
-    // Layer 2: harmonic shimmer (triangle — softer harmonics)
-    const shimmerOsc = ctx.createOscillator()
-    const shimmerGain = ctx.createGain()
-    shimmerOsc.type = 'triangle'
-    shimmerOsc.frequency.value = BASE_FREQ * SHIMMER_RATIO
-    shimmerGain.gain.value = 0
-    shimmerOsc.connect(shimmerGain)
-    shimmerGain.connect(mainPanner)
-    shimmerOsc.start()
+    // Voice gain (controls drone volume)
+    const voiceGain = ctx.createGain()
+    voiceGain.gain.value = 0
+    voiceGain.connect(filter)
 
-    // Layer 3: sub-bass pulse (sine, very low)
-    const subOsc = ctx.createOscillator()
-    const subGain = ctx.createGain()
-    subOsc.type = 'sine'
-    subOsc.frequency.value = BASE_FREQ * 0.5
-    subGain.gain.value = 0
-    subOsc.connect(subGain)
-    subGain.connect(mainPanner)
-    subOsc.start()
+    // Oscillator A (+7 cents detune)
+    const oscA = ctx.createOscillator()
+    oscA.type = 'sine'
+    oscA.frequency.value = MIN_FREQ
+    oscA.detune.value = DETUNE_CENTS
+    oscA.connect(voiceGain)
+    oscA.start()
+
+    // Oscillator B (-7 cents detune)
+    const oscB = ctx.createOscillator()
+    oscB.type = 'sine'
+    oscB.frequency.value = MIN_FREQ
+    oscB.detune.value = -DETUNE_CENTS
+    oscB.connect(voiceGain)
+    oscB.start()
 
     audioRef.current = {
       ctx, masterGain, mainPanner,
-      droneOsc, droneGain,
-      shimmerOsc, shimmerGain,
-      subOsc, subGain,
+      oscA, oscB, voiceGain,
+      filter, analyser, fftData,
+      waveform: 'sine',
     }
     activeRef.current = true
 
     // Fade in master
-    masterGain.gain.setTargetAtTime(0.15, ctx.currentTime, 0.3)
+    masterGain.gain.setTargetAtTime(0.2, ctx.currentTime, 0.3)
   }, [])
 
   const stop = useCallback(() => {
@@ -93,53 +115,98 @@ export function useQuantumAudio() {
     if (!a) return
     activeRef.current = false
 
-    // Fade out then cleanup
     const now = a.ctx.currentTime
     a.masterGain.gain.setTargetAtTime(0, now, 0.3)
     setTimeout(() => {
-      a.droneOsc.stop()
-      a.shimmerOsc.stop()
-      a.subOsc.stop()
+      a.oscA.stop()
+      a.oscB.stop()
       a.ctx.close()
       audioRef.current = null
     }, 1500)
   }, [])
 
+  /** Set oscillator waveform */
+  const setWaveform = useCallback((wf: SynthWaveform) => {
+    const a = audioRef.current
+    if (!a) return
+    a.waveform = wf
+    a.oscA.type = wf
+    a.oscB.type = wf
+  }, [])
+
+  /** Set filter resonance (Q) */
+  const setFilterQ = useCallback((q: number) => {
+    const a = audioRef.current
+    if (!a) return
+    a.filter.Q.setTargetAtTime(q, a.ctx.currentTime, 0.05)
+  }, [])
+
   /**
-   * Update audio state per frame
+   * Update synth per frame
    * @param energy - Current energy level (0-300)
-   * @param maxEnergy - Rip threshold for normalization
-   * @param interferenceRatio - 0=full cancellation, 1=full constructive (from shader)
-   * @param mapX - X coordinate (0 to 1) for stereo panning of continuous layers
+   * @param maxEnergy - Rip threshold
+   * @param interferenceRatio - 0=destructive, 1=constructive
+   * @param mouseX - 0-1 horizontal position (filter cutoff + panning)
+   * @param mouseY - 0-1 vertical position (pitch)
    */
-  const update = useCallback((energy: number, maxEnergy: number, interferenceRatio: number, mapX: number = 0.5) => {
+  const update = useCallback((energy: number, maxEnergy: number, interferenceRatio: number, mouseX: number = 0.5, mouseY?: number) => {
     const a = audioRef.current
     if (!a || !activeRef.current) return
 
     const now = a.ctx.currentTime
     const eNorm = Math.min(energy / Math.max(maxEnergy, 1), 1)
+
+    // Pitch: mouse Y maps C2→C5 (exponential for musical feel)
+    if (mouseY !== undefined) {
+      const yInv = 1.0 - mouseY // invert: top of screen = high pitch
+      const freq = MIN_FREQ * Math.pow(MAX_FREQ / MIN_FREQ, yInv)
+      a.oscA.frequency.setTargetAtTime(freq, now, 0.08)
+      a.oscB.frequency.setTargetAtTime(freq, now, 0.08)
+    }
+
+    // Filter cutoff: mouse X maps 200Hz→8kHz (exponential)
+    const cutoff = 200 * Math.pow(40, mouseX) // 200 * 40^x = 200→8000
+    a.filter.frequency.setTargetAtTime(cutoff, now, 0.05)
+
+    // Voice volume: energy-gated with interference modulation
     const iRatio = Math.max(0, Math.min(1, interferenceRatio))
+    const vol = eNorm * 0.35 * (0.5 + iRatio * 0.5)
+    a.voiceGain.gain.setTargetAtTime(vol, now, 0.05)
 
-    // Drone: pitch rises with energy (A1 → A3)
-    const droneFreq = BASE_FREQ + (MAX_DRONE_FREQ - BASE_FREQ) * eNorm
-    a.droneOsc.frequency.setTargetAtTime(droneFreq, now, 0.1)
-    a.droneGain.gain.setTargetAtTime(eNorm * 0.4, now, 0.05)
-
-    // Shimmer: volume follows interference (constructive = loud, destructive = silent)
-    const shimmerFreq = droneFreq * SHIMMER_RATIO
-    a.shimmerOsc.frequency.setTargetAtTime(shimmerFreq, now, 0.1)
-    a.shimmerGain.gain.setTargetAtTime(iRatio * eNorm * 0.2, now, 0.08)
-
-    // Sub-bass: pulses with energy, detuned slightly for organic feel
-    a.subOsc.frequency.setTargetAtTime(droneFreq * 0.5 + Math.sin(now * 0.3) * 2, now, 0.2)
-    a.subGain.gain.setTargetAtTime(eNorm * eNorm * 0.15, now, 0.1)
-
-    // Panning based on position (0 to 1 maps to -1 to 1)
-    const panTarget = (mapX - 0.5) * 2.0
+    // Panning
+    const panTarget = (mouseX - 0.5) * 2.0
     a.mainPanner.pan.setTargetAtTime(panTarget, now, 0.1)
+
+    // ── FFT Analysis ──
+    a.analyser.getByteFrequencyData(a.fftData)
+    const bins = a.fftData
+    const numBins = bins.length // 128
+
+    // Bass: bins 0-5 (~0-340Hz)
+    let bassSum = 0
+    for (let i = 0; i < Math.min(6, numBins); i++) bassSum += bins[i]
+    const bassRaw = bassSum / (6 * 255)
+
+    // Mid: bins 6-30 (~340Hz-4kHz)
+    let midSum = 0
+    for (let i = 6; i < Math.min(31, numBins); i++) midSum += bins[i]
+    const midRaw = midSum / (25 * 255)
+
+    // Treble: bins 31-63 (~4kHz-11kHz)
+    let trebleSum = 0
+    for (let i = 31; i < Math.min(64, numBins); i++) trebleSum += bins[i]
+    const trebleRaw = trebleSum / (33 * 255)
+
+    // Exponential smoothing
+    const s = smoothRef.current
+    s.bass = s.bass * 0.7 + bassRaw * 0.3
+    s.mid = s.mid * 0.7 + midRaw * 0.3
+    s.treble = s.treble * 0.7 + trebleRaw * 0.3
+
+    fftRef.current = { bass: s.bass, mid: s.mid, treble: s.treble }
   }, [])
 
-  /** Fire a click transient — short burst on catalyst creation with localized panning */
+  /** Fire a click transient with ADSR envelope */
   const triggerClick = useCallback((mapX: number = 0.5) => {
     const a = audioRef.current
     if (!a || !activeRef.current) return
@@ -147,21 +214,36 @@ export function useQuantumAudio() {
     const now = a.ctx.currentTime
     const clickOsc = a.ctx.createOscillator()
     const clickGain = a.ctx.createGain()
-    clickOsc.type = 'sine'
-    clickOsc.frequency.value = 800 + Math.random() * 400
-    clickGain.gain.value = 0.1
-    clickGain.gain.setTargetAtTime(0, now + 0.02, 0.04) // fast decay
+    const clickFilter = a.ctx.createBiquadFilter()
+
+    clickOsc.type = a.waveform
+    clickOsc.frequency.value = 400 + Math.random() * 600
+
+    // ADSR envelope
+    clickGain.gain.setValueAtTime(0, now)
+    clickGain.gain.linearRampToValueAtTime(0.15, now + 0.01)   // Attack: 10ms
+    clickGain.gain.linearRampToValueAtTime(0.045, now + 0.06)  // Decay: 50ms → Sustain 0.3
+    clickGain.gain.linearRampToValueAtTime(0, now + 0.16)      // Release: 100ms
+
+    clickFilter.type = 'lowpass'
+    clickFilter.frequency.value = a.filter.frequency.value // Match current filter
+    clickFilter.Q.value = 1.0
 
     const panner = a.ctx.createStereoPanner()
     panner.pan.value = (mapX - 0.5) * 2.0
-    
-    clickOsc.connect(clickGain)
+
+    clickOsc.connect(clickFilter)
+    clickFilter.connect(clickGain)
     clickGain.connect(panner)
-    panner.connect(a.masterGain)
-    
+    panner.connect(a.analyser) // Route through analyser for FFT pickup
+
     clickOsc.start(now)
-    clickOsc.stop(now + 0.15)
+    clickOsc.stop(now + 0.2)
   }, [])
 
-  return { start, stop, update, triggerClick, activeRef }
+  return {
+    start, stop, update, triggerClick,
+    setWaveform, setFilterQ,
+    activeRef, fftRef,
+  }
 }

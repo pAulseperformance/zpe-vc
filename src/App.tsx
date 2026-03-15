@@ -5,6 +5,7 @@ import { DevPanel, usePersistedTuning } from '@/features/quantum-canvas/ui/DevPa
 import { TerminalIntake } from '@/widgets/terminal-intake'
 import { DevModeButton } from '@/widgets/dev-mode-button/DevModeButton'
 import { useQuantumAudio } from '@/features/quantum-canvas/lib/use-quantum-audio'
+import type { SynthWaveform } from '@/features/quantum-canvas/lib/use-quantum-audio'
 
 const IS_DEV = import.meta.env.DEV
 
@@ -23,6 +24,11 @@ export default function App() {
   const audio = useQuantumAudio()
   const gravBodyPositionsRef = useRef<{click: {x: number, y: number}, mouse: {x: number, y: number}} | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+
+  // Synth controls
+  const [synthWaveform, setSynthWaveform] = useState<SynthWaveform>('sine')
+  const [synthFilterQ, setSynthFilterQ] = useState(2.0)
+  const [audioReactive, setAudioReactive] = useState(true)
 
   // Dev mode — unlocked after rip boot sequence OR always in dev
   const [devUnlocked, setDevUnlocked] = useState(IS_DEV)
@@ -52,15 +58,15 @@ export default function App() {
 
   // Throttle energy display updates to ~10fps to avoid re-render spam
   const lastUpdateRef = useRef(0)
-  const handleEnergyChange = useCallback((energy: number, interferenceRatio: number, mouseX: number) => {
+  const handleEnergyChange = useCallback((energy: number, interferenceRatio: number, mouseX: number, mouseY: number) => {
     energyRef.current = energy
     const now = Date.now()
     if (now - lastUpdateRef.current > 100) {
       lastUpdateRef.current = now
       setEnergyDisplay(energy)
     }
-    // Update audio per frame — interferenceRatio modulates shimmer volume, mouseX for spatial panning
-    audio.update(energy, tuning.ripThreshold, interferenceRatio, mouseX)
+    // Update synth per frame — mouseX=filter cutoff + panning, mouseY=pitch
+    audio.update(energy, tuning.ripThreshold, interferenceRatio, mouseX, mouseY)
   }, [audio, tuning.ripThreshold])
 
   const handleZoomChange = useCallback((delta: number) => {
@@ -98,6 +104,7 @@ export default function App() {
             onZoomChange={handleZoomChange}
             onManualClick={(x, _y) => audio.triggerClick(x)}
             onCanvasReady={(c) => { canvasRef.current = c }}
+            audioBands={audioReactive ? audio.fftRef : undefined}
           />
         </Suspense>
       </motion.div>
@@ -136,6 +143,13 @@ export default function App() {
           onCursorHideChange={setHideCursor}
           gravBodyPositions={gravBodyPositionsRef}
           canvasRef={canvasRef}
+          synthWaveform={synthWaveform}
+          onSynthWaveform={(wf) => { setSynthWaveform(wf); audio.setWaveform(wf) }}
+          synthFilterQ={synthFilterQ}
+          onSynthFilterQ={(q) => { setSynthFilterQ(q); audio.setFilterQ(q) }}
+          audioReactive={audioReactive}
+          onAudioReactive={setAudioReactive}
+          fftRef={audio.fftRef}
         />
       )}
     </div>

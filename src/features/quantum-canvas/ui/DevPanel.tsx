@@ -7,7 +7,9 @@ import { PresetControls } from './PresetControls'
 import { AutoSimControls } from './AutoSimControls'
 import { BarrierControls } from './BarrierControls'
 import { ExportControls } from './ExportControls'
+import { SynthControls } from './SynthControls'
 import { SliderGroup } from './SliderGroup'
+import type { SynthWaveform, FFTBands } from '../lib/use-quantum-audio'
 
 export type { ShaderTuning }
 export { DEFAULT_TUNING } from '../lib/shader-tuning'
@@ -31,9 +33,17 @@ interface DevPanelProps {
   onCursorHideChange: (value: boolean) => void
   gravBodyPositions: MutableRefObject<{click: {x: number, y: number}, mouse: {x: number, y: number}} | null>
   canvasRef: MutableRefObject<HTMLCanvasElement | null>
+  // Synth controls
+  synthWaveform: SynthWaveform
+  onSynthWaveform: (wf: SynthWaveform) => void
+  synthFilterQ: number
+  onSynthFilterQ: (q: number) => void
+  audioReactive: boolean
+  onAudioReactive: (v: boolean) => void
+  fftRef: MutableRefObject<FFTBands>
 }
 
-export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, hideCursor, onCursorHideChange, gravBodyPositions, canvasRef }: DevPanelProps) {
+export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, hideCursor, onCursorHideChange, gravBodyPositions, canvasRef, synthWaveform, onSynthWaveform, synthFilterQ, onSynthFilterQ, audioReactive, onAudioReactive, fftRef }: DevPanelProps) {
   const [collapsed, setCollapsed] = useState(false)
   const sim = useAutoSim({ onSimClick, onSimMouseActiveChange, onSimMouseUpdate, zoomMode: tuning.zoomMode })
 
@@ -183,6 +193,17 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
         canvasRef={canvasRef}
       />
       <ExportControls canvasRef={canvasRef} />
+      {audioEnabled && (
+        <SynthControls
+          waveform={synthWaveform}
+          onWaveformChange={onSynthWaveform}
+          filterQ={synthFilterQ}
+          onFilterQChange={onSynthFilterQ}
+          audioReactive={audioReactive}
+          onAudioReactiveChange={onAudioReactive}
+          fftRef={fftRef}
+        />
+      )}
       <BarrierControls tuning={tuning} onChange={onChange} />
       <AutoSimControls sim={sim} />
 
