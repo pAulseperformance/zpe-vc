@@ -213,7 +213,41 @@ export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
       rate: 10,
     },
     ripBlocked: true,
-  }
+  },
+  'Singularity': {
+    ...DEFAULT_TUNING,
+    paletteMode: 1, // Artistic
+    wavelength: 2,
+    waveSpeed: 0.1,
+    waveFreq: 10,
+    waveWidth: 0.08,
+    emDamping: 6.7,
+    gravDamping: 8.2,
+    waveLifetime: 1,
+    maxWaves: 40,
+    lenzStrength: 0,
+    lenzWake: 0,
+    energyDecay: 2,
+    velocityMult: 5,
+    clickSpike: 5,
+    ripThreshold: 30,
+    parallaxDepth: 0.86,
+    heatDecay: 56,
+    heatAttack: 35,
+    heatIntensity: 0.45,
+    interferenceBlend: 3.65,
+    iridescence: 0,
+    starField: 19.2,
+    hoverWarp: 0,
+    spinSpeed: 19.5,
+    godMode: true,
+    autoSim: {
+      active: true,
+      mode: 'single',
+      rate: 10,
+    },
+    ripBlocked: true,
+  },
 }
 
 export interface SliderDef {

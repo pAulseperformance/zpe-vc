@@ -1,6 +1,6 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, Suspense, lazy } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { QuantumCanvas } from '@/features/quantum-canvas'
+const QuantumCanvas = lazy(() => import('@/features/quantum-canvas/ui/QuantumCanvas'))
 import { DevPanel, usePersistedTuning } from '@/features/quantum-canvas/ui/DevPanel'
 import { TerminalIntake } from '@/widgets/terminal-intake'
 import { DevModeButton } from '@/widgets/dev-mode-button/DevModeButton'
@@ -73,15 +73,17 @@ export default function App() {
         transition={{ duration: 1.5, delay: isForging ? 0.3 : 0 }}
         style={{ pointerEvents: isForging ? 'none' : 'auto', cursor: hideCursor ? 'none' : 'crosshair' }}
       >
-        <QuantumCanvas
-          onRip={onRip}
-          tuning={tuning}
-          onEnergyChange={handleEnergyChange}
-          energyOverride={energyOverride}
-          simClickQueue={simClickQueueRef}
-          simMouseActive={simMouseActive}
-          simMousePos={simMousePosRef}
-        />
+        <Suspense fallback={<div className="absolute inset-0 bg-black" />}>
+          <QuantumCanvas
+            onRip={onRip}
+            tuning={tuning}
+            onEnergyChange={handleEnergyChange}
+            energyOverride={energyOverride}
+            simClickQueue={simClickQueueRef}
+            simMouseActive={simMouseActive}
+            simMousePos={simMousePosRef}
+          />
+        </Suspense>
       </motion.div>
 
       <AnimatePresence>

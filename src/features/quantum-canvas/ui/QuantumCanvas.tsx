@@ -304,3 +304,5 @@ export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, s
     </Canvas>
   )
 }
+
+export default QuantumCanvas

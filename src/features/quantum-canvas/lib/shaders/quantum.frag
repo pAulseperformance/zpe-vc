@@ -309,18 +309,29 @@ void main() {
     cat.x *= aspect;
     cat.x -= (aspect - 1.0) * 0.5;
 
-    // ── Fractal-warped distance (organic, not circular) ──
+    // ── PERF: Damping cull — wave amplitude < 0.03%, skip entirely ──
+    float emDamping = exp(-age * uEmDamping);
+    if (emDamping < 0.0003) continue;
+
+    // ── PERF: Coarse distance cull BEFORE expensive snoise ──
+    // Use cheap rawDist to check if pixel is anywhere near this wave's influence zone.
+    // Tolerance = max of wavefront ring width, heat trail depth, and Lenz wake.
     vec2 delta = warpedUV - cat;
     float rawDist = length(delta);
+    float waveFront = age * uWaveSpeed;
+    float influenceRadius = max(uWaveWidth * 4.0, uLenzWake + 0.1);
+    float thermalReach = 0.02 + uHeatAttack * 0.12; // matches thermalDelay calc below
+    float cullRadius = max(influenceRadius, thermalReach + 0.05);
+    // Skip if pixel is beyond the wavefront + tolerance, AND before the wavefront origin  
+    if (rawDist > waveFront + cullRadius && rawDist > cullRadius) continue;
+
+    // ── Fractal-warped distance (organic, not circular) ──
     float warpAngle = atan(delta.y, delta.x);
     float distWarp = snoise(vec2(warpAngle * 3.0, rawDist * 8.0 + age * 2.0)) * 0.04
                    + snoise(vec2(warpAngle * 7.0 + 20.0, rawDist * 15.0 - age * 1.5)) * 0.02
                    + snoise(vec2(warpAngle * 13.0 + 50.0, rawDist * 25.0 + age * 3.0)) * 0.01;
     float dist = rawDist + distWarp;
 
-    float waveFront = age * uWaveSpeed;
-
-    float emDamping = exp(-age * uEmDamping);
     // Inverse-square gravitational decay (1/r² law, not exponential)
     float lenzDamping = 1.0 / (1.0 + age * age * uGravDamping * uGravDamping);
 

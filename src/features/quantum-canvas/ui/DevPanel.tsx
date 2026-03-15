@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useAutoSim } from '../lib/use-auto-sim'
 import { MOUSE_SLIDERS, OBJECT_SLIDERS, UNIVERSE_SLIDERS, DEFAULT_TUNING } from '../lib/shader-tuning'
-import type { ShaderTuning, SliderDef } from '../lib/shader-tuning'
+import type { ShaderTuning } from '../lib/shader-tuning'
 import { PresetControls } from './PresetControls'
 import { AutoSimControls } from './AutoSimControls'
 import { BarrierControls } from './BarrierControls'
+import { SliderGroup } from './SliderGroup'
 
 export type { ShaderTuning }
 export { DEFAULT_TUNING } from '../lib/shader-tuning'
@@ -46,64 +47,6 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
       </button>
     )
   }
-
-  const GOD_MODE_WAVE_WARN = 200
-  const GOD_MODE_WAVE_DANGER = 500
-  const GOD_MODE_WAVE_HARD_CAP = 2000
-
-  const renderSliderGroup = (sliders: SliderDef[]) =>
-    sliders.map(({ key, label, min, max, step }) => {
-      const val = tuning[key] as number
-      const isWaveGod = key === 'maxWaves' && tuning.godMode
-      const isWaveDanger = isWaveGod && val > GOD_MODE_WAVE_WARN
-      const isWaveCritical = isWaveGod && val > GOD_MODE_WAVE_DANGER
-
-      const handleSliderChange = (newVal: number) => {
-        if (key === 'maxWaves' && newVal > GOD_MODE_WAVE_HARD_CAP) newVal = GOD_MODE_WAVE_HARD_CAP
-        handleChange(key, newVal)
-      }
-
-      return (
-        <div key={key}>
-          <div className="flex items-center gap-2">
-            <label className={`text-[0.55rem] w-20 shrink-0 truncate ${isWaveCritical ? 'text-red-400' : isWaveDanger ? 'text-yellow-400' : isWaveGod ? 'text-orange-400' : 'text-cold-white-dim/40'}`}>{label}</label>
-            <input
-              type="range" min={min} max={tuning.godMode ? (key === 'maxWaves' ? GOD_MODE_WAVE_HARD_CAP : max * 50) : max} step={step}
-              value={val}
-              onChange={(e) => handleSliderChange(parseFloat(e.target.value))}
-              className="flex-1 h-1 accent-electric-purple"
-            />
-            {tuning.godMode ? (
-              <input 
-                type="number" 
-                value={val} 
-                onChange={(e) => handleSliderChange(parseFloat(e.target.value) || 0)}
-                className={`text-[0.55rem] w-12 text-right tabular-nums bg-transparent border-b outline-none appearance-none ${isWaveCritical ? 'border-red-400/50 text-red-400' : isWaveDanger ? 'border-yellow-400/50 text-yellow-400' : 'border-electric-purple/50 text-electric-purple'}`}
-              />
-            ) : (
-              <span className="text-[0.55rem] w-10 text-right tabular-nums">
-                {val.toFixed(step < 1 ? (step < 0.01 ? 3 : 2) : 0)}
-              </span>
-            )}
-          </div>
-          {isWaveCritical && (
-            <div className="text-[0.5rem] text-red-400 bg-red-400/10 border border-red-400/30 rounded px-1.5 py-0.5 mt-0.5 animate-pulse">
-              ☠️ YOU WILL GET REKT — GPU meltdown imminent ({val} waves/pixel/frame)
-            </div>
-          )}
-          {isWaveDanger && !isWaveCritical && (
-            <div className="text-[0.5rem] text-yellow-400 bg-yellow-400/10 border border-yellow-400/30 rounded px-1.5 py-0.5 mt-0.5">
-              ⚠️ GPU Warning — {val} waves is heavy, frames may drop
-            </div>
-          )}
-          {isWaveGod && !isWaveDanger && (
-            <div className="text-[0.5rem] text-orange-400 bg-orange-400/10 border border-orange-400/20 rounded px-1.5 py-0.5 mt-0.5">
-              🔥 Max Waves unlocked — increase carefully (hard cap: {GOD_MODE_WAVE_HARD_CAP})
-            </div>
-          )}
-        </div>
-      )
-    })
 
   return (
     <div className="fixed top-3 right-3 z-50 w-72 bg-black/90 border border-electric-purple/30 rounded-lg p-3 font-mono text-xs text-cold-white-dim backdrop-blur-sm">
@@ -162,15 +105,15 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
         >
           {tuning.pointerHover ? '☑ Hover Warp Active' : '☐ Hover Warp Disabled'}
         </button>
-        {renderSliderGroup(MOUSE_SLIDERS)}
+        <SliderGroup sliders={MOUSE_SLIDERS} tuning={tuning} onChange={handleChange} />
 
         {/* Click Object */}
         <div className="text-[0.55rem] text-electric-purple/50 uppercase tracking-widest mt-2 mb-0.5 border-b border-electric-purple/10 pb-0.5">💥 Click Object (EM Waves)</div>
-        {renderSliderGroup(OBJECT_SLIDERS)}
+        <SliderGroup sliders={OBJECT_SLIDERS} tuning={tuning} onChange={handleChange} />
 
         {/* Universe */}
         <div className="text-[0.55rem] text-electric-purple/50 uppercase tracking-widest mt-2 mb-0.5 border-b border-electric-purple/10 pb-0.5">🌌 Universe</div>
-        {renderSliderGroup(UNIVERSE_SLIDERS)}
+        <SliderGroup sliders={UNIVERSE_SLIDERS} tuning={tuning} onChange={handleChange} />
       </div>
 
       <PresetControls
