@@ -277,6 +277,7 @@ void main() {
   float mouseDist = distance(uv, mouse);
   float hoverInfluence = smoothstep(uHoverRadius, 0.0, mouseDist) * uPointerHover;
   float speedMult = 1.0 + uHoverWarp * 15.0 * hoverInfluence;
+  float brightMult = 1.0 + uHoverWarp * 8.0 * hoverInfluence;
   float localWarp = uHoverWarp * 0.2 * hoverInfluence;
 
   vec2 hoverWarpOffset = vec2(
