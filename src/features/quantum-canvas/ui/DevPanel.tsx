@@ -54,8 +54,9 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
   const renderSliderGroup = (sliders: SliderDef[]) =>
     sliders.map(({ key, label, min, max, step }) => {
       const val = tuning[key] as number
-      const isWaveDanger = key === 'maxWaves' && tuning.godMode && val > GOD_MODE_WAVE_WARN
-      const isWaveCritical = key === 'maxWaves' && tuning.godMode && val > GOD_MODE_WAVE_DANGER
+      const isWaveGod = key === 'maxWaves' && tuning.godMode
+      const isWaveDanger = isWaveGod && val > GOD_MODE_WAVE_WARN
+      const isWaveCritical = isWaveGod && val > GOD_MODE_WAVE_DANGER
 
       const handleSliderChange = (newVal: number) => {
         if (key === 'maxWaves' && newVal > GOD_MODE_WAVE_HARD_CAP) newVal = GOD_MODE_WAVE_HARD_CAP
@@ -65,7 +66,7 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
       return (
         <div key={key}>
           <div className="flex items-center gap-2">
-            <label className={`text-[0.55rem] w-20 shrink-0 truncate ${isWaveDanger ? 'text-red-400' : 'text-cold-white-dim/40'}`}>{label}</label>
+            <label className={`text-[0.55rem] w-20 shrink-0 truncate ${isWaveCritical ? 'text-red-400' : isWaveDanger ? 'text-yellow-400' : isWaveGod ? 'text-orange-400' : 'text-cold-white-dim/40'}`}>{label}</label>
             <input
               type="range" min={min} max={tuning.godMode ? (key === 'maxWaves' ? GOD_MODE_WAVE_HARD_CAP : max * 50) : max} step={step}
               value={val}
@@ -77,7 +78,7 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
                 type="number" 
                 value={val} 
                 onChange={(e) => handleSliderChange(parseFloat(e.target.value) || 0)}
-                className={`text-[0.55rem] w-12 text-right tabular-nums bg-transparent border-b outline-none appearance-none ${isWaveDanger ? 'border-red-400/50 text-red-400' : 'border-electric-purple/50 text-electric-purple'}`}
+                className={`text-[0.55rem] w-12 text-right tabular-nums bg-transparent border-b outline-none appearance-none ${isWaveCritical ? 'border-red-400/50 text-red-400' : isWaveDanger ? 'border-yellow-400/50 text-yellow-400' : 'border-electric-purple/50 text-electric-purple'}`}
               />
             ) : (
               <span className="text-[0.55rem] w-10 text-right tabular-nums">
@@ -93,6 +94,11 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           {isWaveDanger && !isWaveCritical && (
             <div className="text-[0.5rem] text-yellow-400 bg-yellow-400/10 border border-yellow-400/30 rounded px-1.5 py-0.5 mt-0.5">
               ⚠️ GPU Warning — {val} waves is heavy, frames may drop
+            </div>
+          )}
+          {isWaveGod && !isWaveDanger && (
+            <div className="text-[0.5rem] text-orange-400 bg-orange-400/10 border border-orange-400/20 rounded px-1.5 py-0.5 mt-0.5">
+              🔥 Max Waves unlocked — increase carefully (hard cap: {GOD_MODE_WAVE_HARD_CAP})
             </div>
           )}
         </div>
