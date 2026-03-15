@@ -504,7 +504,7 @@ void main() {
   // ── Background star field with gravitational lensing ──
   // Stars are lensed by gravity sources → Einstein ring effect near catalysts
   vec2 starUV = vUv + lenzDisplacement * 3.0; // amplify lensing for visible distortion
-  float starGrid = 150.0; // star density
+  float starGrid = 80.0; // star density (lower = bigger cells = more visible)
   vec2 starCell = floor(starUV * starGrid);
   vec2 starFrac = fract(starUV * starGrid);
   // Pseudo-random hash per cell (deterministic star positions)
@@ -513,12 +513,18 @@ void main() {
   // Star position within cell
   vec2 starPos = vec2(fract(starHash * 13.37), fract(starHash2 * 7.41));
   float starDist = length(starFrac - starPos);
-  // Star brightness: sharp point with subtle twinkle
-  float twinkle = sin(t * (1.0 + starHash * 3.0) + starHash * 6.28) * 0.3 + 0.7;
-  float starBright = smoothstep(0.03, 0.005, starDist) * step(0.85, starHash) * twinkle;
+  // Star brightness: varying sizes, subtle twinkle
+  float twinkle = sin(t * (1.0 + starHash * 3.0) + starHash * 6.28) * 0.2 + 0.8;
+  float starSize = 0.02 + starHash2 * 0.04; // varying star sizes
+  float starBright = smoothstep(starSize, starSize * 0.2, starDist)
+                   * step(0.65, starHash) // 35% of cells have stars
+                   * twinkle;
+  // Extra-bright stars (rare, large)
+  float bigStar = smoothstep(0.06, 0.01, starDist) * step(0.95, starHash) * 2.0;
+  starBright += bigStar;
   // Star color temperature: warm white to blue-white
   vec3 starColor = mix(vec3(1.0, 0.95, 0.85), vec3(0.85, 0.92, 1.0), starHash2);
-  color += starColor * starBright * 0.15 * uStarField;
+  color += starColor * starBright * 0.8 * uStarField;
 
   // ── Multi-wavelength rendering ──
   float totalLum = dot(color, vec3(0.299, 0.587, 0.114));
