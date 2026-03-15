@@ -75,6 +75,13 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
       uStarField: { value: tuning.starField ?? 0 },
       uWavelength: { value: tuning.wavelength ?? 2 },
       uMouseVelocity: { value: new THREE.Vector2(0, 0) },
+      // Barrier / Diffraction
+      uBarrierEnabled: { value: tuning.barrierEnabled ?? 0 },
+      uBarrierY: { value: tuning.barrierY ?? 0.5 },
+      uSlitCount: { value: tuning.slitCount ?? 2 },
+      uSlitWidth: { value: tuning.slitWidth ?? 0.04 },
+      uSlitSeparation: { value: tuning.slitSeparation ?? 0.15 },
+      uDiffSamples: { value: tuning.diffSamples ?? 12 },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
@@ -228,6 +235,13 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
     mat.uniforms.uStarField.value = t.starField ?? 0
     mat.uniforms.uWavelength.value = t.wavelength ?? 2
     mat.uniforms.uMouseVelocity.value.copy(velocityVec)
+    // Barrier / Diffraction
+    mat.uniforms.uBarrierEnabled.value = t.barrierEnabled ?? 0
+    mat.uniforms.uBarrierY.value = t.barrierY ?? 0.5
+    mat.uniforms.uSlitCount.value = t.slitCount ?? 2
+    mat.uniforms.uSlitWidth.value = t.slitWidth ?? 0.04
+    mat.uniforms.uSlitSeparation.value = t.slitSeparation ?? 0.15
+    mat.uniforms.uDiffSamples.value = t.diffSamples ?? 12
   })
 
   return (

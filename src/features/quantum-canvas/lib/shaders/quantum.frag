@@ -40,6 +40,14 @@ uniform float uPaletteMode; // 0 = physical, 1 = artistic, 2 = hybrid
 uniform float uStarField;   // 0 = off, 1 = full brightness
 uniform float uWavelength;  // 0=radio, 1=infrared, 2=visible, 3=xray, 4=gamma
 
+// ─── Barrier / Diffraction Uniforms ───
+uniform float uBarrierEnabled;  // 0=off, 1=on
+uniform float uBarrierY;        // Barrier Y position (UV space, 0–1)
+uniform float uSlitCount;       // 0=solid wall, 1=single, 2=double, 3=triple
+uniform float uSlitWidth;       // Aperture width (UV units)
+uniform float uSlitSeparation;  // Center-to-center slit distance
+uniform float uDiffSamples;     // Huygens sample count (4–16)
+
 // ─── Palette ───
 const vec3 BLACK     = vec3(0.0);
 const vec3 COLD_WHT  = vec3(0.75, 0.78, 0.88);   // Idle dust
@@ -164,6 +172,87 @@ float snoise(vec2 v) {
   return 130.0 * dot(m, g);
 }
 
+// ═══════════════════════════════════════
+// HUYGENS-FRESNEL DIFFRACTION
+// ═══════════════════════════════════════
+// Numerical Huygens' principle: sample secondary sources across slit apertures.
+// Returns (signedField, envelope) — drops into existing interference compositing.
+
+// Check if a point is inside any slit aperture
+// Returns 0.0 if blocked by barrier, 1.0 if in a slit
+float isInSlit(float x) {
+  float cx = 0.5; // barrier center X (always centered)
+  int slits = int(uSlitCount);
+  float halfW = uSlitWidth * 0.5;
+
+  for (int s = 0; s < 4; s++) {
+    if (s >= slits) break;
+    // Slit center: evenly spaced around cx
+    float offset = (float(s) - (float(slits) - 1.0) * 0.5) * uSlitSeparation;
+    float slitCenter = cx + offset;
+    if (abs(x - slitCenter) < halfW) return 1.0;
+  }
+  return 0.0;
+}
+
+// Compute Huygens diffracted wave at pixel position from a single catalyst
+// through all slit apertures. Returns vec2(signedField, envelope).
+vec2 huygensDiffraction(vec2 pixelUV, vec2 catUV, float freq, float age, float speed) {
+  float barrierYScaled = uBarrierY;
+  int slits = int(uSlitCount);
+  int samples = int(uDiffSamples);
+  float cx = 0.5;
+  float halfW = uSlitWidth * 0.5;
+  float signedSum = 0.0;
+  float envelopeSum = 0.0;
+  float totalSamples = 0.0;
+
+  // For each slit aperture, sample secondary sources
+  for (int s = 0; s < 4; s++) {
+    if (s >= slits) break;
+    float offset = (float(s) - (float(slits) - 1.0) * 0.5) * uSlitSeparation;
+    float slitCenter = cx + offset;
+    float slitLeft = slitCenter - halfW;
+
+    for (int n = 0; n < 16; n++) {
+      if (n >= samples) break;
+      // Sample point along slit aperture
+      float frac = (float(n) + 0.5) / float(samples);
+      float sampleX = slitLeft + frac * uSlitWidth;
+      vec2 slitPoint = vec2(sampleX, barrierYScaled);
+
+      // Distance: catalyst → slit point → pixel (Huygens' path)
+      float d1 = distance(catUV, slitPoint);
+      float d2 = distance(slitPoint, pixelUV);
+      float totalDist = d1 + d2;
+
+      // Wave must have reached the slit point
+      float waveFront = age * speed;
+      if (d1 > waveFront) continue;
+
+      // Secondary source: same phase as arriving wave, re-emits spherically
+      float wave = sin(totalDist * freq - age * 30.0);
+
+      // Amplitude falls off with total path length
+      float amp = 1.0 / (1.0 + totalDist * 8.0);
+
+      signedSum += wave * amp;
+      envelopeSum += abs(wave) * amp;
+      totalSamples += 1.0;
+    }
+  }
+
+  // Normalize by sample count to keep intensity consistent
+  if (totalSamples > 0.0) {
+    signedSum /= totalSamples;
+    envelopeSum /= totalSamples;
+    // Scale up to compensate for diffraction spreading
+    signedSum *= float(slits);
+    envelopeSum *= float(slits);
+  }
+
+  return vec2(signedSum, envelopeSum);
+}
 
 void main() {
   float aspect = uResolution.x / uResolution.y;
@@ -254,6 +343,32 @@ void main() {
     // Single source: abs(sin(d*f)) / abs(sin(d*f)) = 1.0 everywhere → no self-interference
     // Two sources: sin(d1*f) + sin(d2*f) cancels where d1-d2 = λ/2 → visible dark bands
     float cleanWave = sin(dist * uWaveFreq - age * 30.0);
+
+    // ── Barrier diffraction ──
+    // If barrier is enabled: check if wave path crosses the barrier
+    if (uBarrierEnabled > 0.5) {
+      bool catAbove = cat.y > uBarrierY;
+      bool pixAbove = warpedUV.y > uBarrierY;
+      bool crosses = (catAbove != pixAbove); // path crosses barrier
+
+      if (crosses) {
+        if (uSlitCount < 0.5) {
+          // Solid wall — full shadow (no wave passes)
+          cleanWave = 0.0;
+          extendedField *= 0.02; // tiny tunneling leak
+        } else {
+          // Huygens-Fresnel diffraction through slits
+          float emDamp = exp(-age * uEmDamping);
+          vec2 huygens = huygensDiffraction(
+            warpedUV, cat, uWaveFreq, age, uWaveSpeed
+          );
+          cleanWave = huygens.x;
+          // Modulate extended field by diffracted amplitude
+          extendedField *= max(huygens.y, 0.01) * emDamp;
+        }
+      }
+    }
+
     waveFieldSigned += cleanWave * extendedField;
     waveFieldEnvelope += abs(cleanWave) * extendedField;
 

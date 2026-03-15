@@ -21,6 +21,13 @@ export interface ShaderTuning {
   paletteMode: number  // 0=physical, 1=artistic, 2=hybrid
   starField: number    // 0=off, 1=full brightness
   wavelength: number   // 0=radio, 1=infrared, 2=visible, 3=xray, 4=gamma
+  // Barrier / Diffraction
+  barrierEnabled: number  // 0=off, 1=on
+  barrierY: number        // Barrier Y position (UV space)
+  slitCount: number       // 0=solid wall, 1=single, 2=double, 3=triple
+  slitWidth: number       // Aperture width (UV units)
+  slitSeparation: number  // Center-to-center slit distance
+  diffSamples: number     // Huygens sample count
 }
 
 export const DEFAULT_TUNING: ShaderTuning = {
@@ -46,6 +53,12 @@ export const DEFAULT_TUNING: ShaderTuning = {
   paletteMode: 1,  // Default: artistic
   starField: 0,     // Off by default
   wavelength: 2,    // Visible light (default)
+  barrierEnabled: 0,
+  barrierY: 0.5,
+  slitCount: 2,       // Double slit (Young's experiment)
+  slitWidth: 0.04,
+  slitSeparation: 0.15,
+  diffSamples: 12,
 }
 
 export interface SliderDef {

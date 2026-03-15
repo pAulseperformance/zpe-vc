@@ -4,6 +4,7 @@ import { SLIDERS, DEFAULT_TUNING } from '../lib/shader-tuning'
 import type { ShaderTuning } from '../lib/shader-tuning'
 import { PresetControls } from './PresetControls'
 import { AutoSimControls } from './AutoSimControls'
+import { BarrierControls } from './BarrierControls'
 
 export type { ShaderTuning }
 export { DEFAULT_TUNING } from '../lib/shader-tuning'
@@ -85,6 +86,7 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
       </div>
 
       <PresetControls tuning={tuning} onChange={onChange} />
+      <BarrierControls tuning={tuning} onChange={onChange} />
       <AutoSimControls sim={sim} />
     </div>
   )
