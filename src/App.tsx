@@ -150,19 +150,37 @@ export default function App() {
       lastUpdateRef.current = now
       setEnergyDisplay(energy)
     }
-    // Update synth per frame — use hand position if active, else mouse
+    // Update synth per frame — use hand mappings if active, else mouse
     const handS = hand.stateRef.current
     const useHand = hand.active && handS.detected
-    const synthX = useHand ? handS.x : mouseX
-    const synthY = useHand ? handS.y : mouseY
+    let synthX = mouseX
+    let synthY = mouseY
+    if (useHand) {
+      // Route hand axes through configurable mappings
+      const filterVal = hand.getTargetValue('filter')
+      const pitchVal = hand.getTargetValue('pitch')
+      const volumeVal = hand.getTargetValue('volume')
+      const delayVal = hand.getTargetValue('delayMix')
+      const reverbVal = hand.getTargetValue('reverbMix')
+
+      synthX = filterVal ?? mouseX
+      synthY = pitchVal ?? mouseY
+
+      // Apply volume/FX targets from hand axes
+      if (volumeVal !== null) audio.setDroneVolume(volumeVal)
+      if (delayVal !== null) audio.setDelayMix(delayVal)
+      if (reverbVal !== null) audio.setReverbMix(reverbVal)
+    }
     audio.update(energy, tuning.ripThreshold, interferenceRatio, synthX, synthY)
 
     // Hand pinch → note trigger (sustained while pinching)
     if (useHand && audioEnabled) {
+      const pitchVal = hand.getTargetValue('pitch')
+      const notePitch = pitchVal ?? handS.y
       if (handS.pinching && !wasPinchingRef.current) {
         // Pinch start → play sustained note
         handNoteRef.current?.release()
-        const freq = yToFreq(handS.y, synthScale)
+        const freq = yToFreq(notePitch, synthScale)
         handNoteRef.current = audio.playNote(freq, 0.8, true)
         // Spawn visual wave at hand position
         simClickQueueRef.current.push({ x: handS.x, y: handS.y })
@@ -170,9 +188,6 @@ export default function App() {
         // Pinch end → release note
         handNoteRef.current?.release()
         handNoteRef.current = null
-      } else if (handS.pinching && handNoteRef.current) {
-        // While pinching, continuously update pitch based on hand Y
-        // (this creates a pitch-bend effect as you move your hand)
       }
       wasPinchingRef.current = handS.pinching
     }
