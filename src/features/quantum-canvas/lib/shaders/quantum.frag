@@ -184,7 +184,8 @@ void main() {
     float waveFront = age * uWaveSpeed;
 
     float emDamping = exp(-age * uEmDamping);
-    float lenzDamping = exp(-age * uGravDamping);
+    // Inverse-square gravitational decay (1/r² law, not exponential)
+    float lenzDamping = 1.0 / (1.0 + age * age * uGravDamping * uGravDamping);
 
     // Wavefront ring (sharp visual)
     float frontDist = abs(dist - waveFront);
@@ -211,8 +212,17 @@ void main() {
     waveFieldSigned += cleanWave * extendedField;
     waveFieldEnvelope += abs(cleanWave) * extendedField;
 
-    // ── Additive color (old path — uses sharp ring for visual wavefront) ──
-    float specBase = emIntensity * 0.4 + eNorm * 0.25 + age * 0.1;
+    // ── Lenz collapse (computed first for redshift dependency) ──
+    float collapsePhase = clamp(age * uGravDamping * 0.5, 0.0, 1.0);
+    float effectiveWake = uLenzWake * (1.0 - collapsePhase);
+    float behindFront = smoothstep(waveFront, waveFront - max(effectiveWake, 0.001), rawDist);
+    float pointCollapse = exp(-rawDist * rawDist * (20.0 + collapsePhase * 300.0));
+    float lenzMask = mix(behindFront, pointCollapse, collapsePhase * collapsePhase);
+
+    // ── Additive color (uses sharp ring for visual wavefront) ──
+    // Gravitational redshift: waves near collapse zones shift toward red
+    float redshift = lenzMask * collapsePhase * 0.3;
+    float specBase = emIntensity * 0.4 + eNorm * 0.25 + age * 0.1 - redshift;
     float disp = 0.08;
     vec3 waveColor = vec3(
       energySpectrum(specBase - disp).r,
@@ -226,14 +236,10 @@ void main() {
     float wavePassed = 1.0 - smoothstep(waveFront - 0.02, waveFront, rawDist);
     heatResidual += wavePassed * exp(-age * uHeatDecay);
 
-    // ── Lenz collapse ──
-    float collapsePhase = clamp(age * uGravDamping * 0.5, 0.0, 1.0);
-    float effectiveWake = uLenzWake * (1.0 - collapsePhase);
-    float behindFront = smoothstep(waveFront, waveFront - max(effectiveWake, 0.001), rawDist);
-    float pointCollapse = exp(-rawDist * rawDist * (20.0 + collapsePhase * 300.0));
-    float lenzMask = mix(behindFront, pointCollapse, collapsePhase * collapsePhase);
+    // ── Lenz displacement ──
     vec2 dirToCenter = (rawDist > 0.001) ? normalize(cat - warpedUV) : vec2(0.0);
-    lenzDisplacement += dirToCenter * lenzMask * lenzDamping * uLenzStrength;
+    // Energy-proportional lensing: E=mc² → more energy = stronger curvature
+    lenzDisplacement += dirToCenter * lenzMask * lenzDamping * uLenzStrength * (0.3 + eNorm * 0.7);
   }
 
   // ── Wave interference compositing ──
@@ -270,14 +276,17 @@ void main() {
     : 0.0;
 
   // Additive path color also respects palette mode
+  // Quantum tunneling: small probability of energy leaking through void barriers
+  float tunnelLeak = 0.05; // 5% tunneling probability
   vec3 catalystColor;
   if (uPaletteMode < 0.5) {
-    // Physical: use blackbody for additive too — interference is pure intensity
     catalystColor = mix(catalystColorAdditive, catalystColorInterference, uInterferenceBlend);
-    catalystColor *= mix(1.0, 1.0 - voidStrength * 0.9, uInterferenceBlend);
+    float voidDarken = max(1.0 - voidStrength * 0.9, tunnelLeak);
+    catalystColor *= mix(1.0, voidDarken, uInterferenceBlend);
   } else {
     catalystColor = mix(catalystColorAdditive, catalystColorInterference, uInterferenceBlend);
-    catalystColor *= mix(1.0, 1.0 - voidStrength * 0.8, uInterferenceBlend);
+    float voidDarken = max(1.0 - voidStrength * 0.8, tunnelLeak);
+    catalystColor *= mix(1.0, voidDarken, uInterferenceBlend);
   }
 
   // Clamp heat residual
