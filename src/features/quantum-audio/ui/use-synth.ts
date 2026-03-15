@@ -59,6 +59,7 @@ export function useSynth() {
   const setReverbDecay = useCallback((s: number) => { getEngine().setReverbDecay(s) }, [])
   const setDistortion = useCallback((v: number) => { getEngine().setDistortion(v) }, [])
   const setAutoDistortion = useCallback((on: boolean) => { getEngine().setAutoDistortion(on) }, [])
+  const setVolume = useCallback((v: number) => { getEngine().setVolume(v) }, [])
   const setEnvelope = useCallback((a: number, d: number, s: number, r: number) => {
     getEngine().setEnvelope(a, d, s, r)
   }, [])
@@ -90,7 +91,7 @@ export function useSynth() {
     setUnisonCount, setDetuneSpread,
     setDelayTime, setDelayFeedback, setDelayMix,
     setReverbMix, setReverbDecay,
-    setDistortion, setAutoDistortion, setEnvelope,
+    setDistortion, setAutoDistortion, setVolume, setEnvelope,
     activeRef,
     fftRef: fftRef as MutableRefObject<FFTBands>,
   }

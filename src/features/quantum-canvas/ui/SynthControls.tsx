@@ -14,6 +14,8 @@ interface SynthControlsProps {
   onUnisonCountChange: (n: number) => void
   detuneSpread: number
   onDetuneSpreadChange: (c: number) => void
+  volume: number
+  onVolumeChange: (v: number) => void
   fftRef: MutableRefObject<FFTBands>
 }
 
@@ -42,6 +44,7 @@ export function SynthControls({
   scale, onScaleChange,
   unisonCount, onUnisonCountChange,
   detuneSpread, onDetuneSpreadChange,
+  volume, onVolumeChange,
   fftRef,
 }: SynthControlsProps) {
   const bands = fftRef.current
@@ -49,6 +52,15 @@ export function SynthControls({
   return (
     <div className="mt-3 pt-3 border-t border-cold-white-dim/10">
       <span className="text-[0.6rem] text-electric-purple/60 tracking-wider uppercase">Synth</span>
+
+      {/* Volume */}
+      <div className="flex items-center gap-2 mt-2">
+        <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Vol</span>
+        <input type="range" min={0} max={1} step={0.01} value={volume}
+          onChange={e => onVolumeChange(Number(e.target.value))}
+          className="flex-1 h-1 accent-electric-purple" />
+        <span className="text-[0.55rem] w-8 text-right">{(volume * 100).toFixed(0)}%</span>
+      </div>
 
       {/* Waveform selector */}
       <div className="flex items-center gap-2 mt-2">

@@ -32,6 +32,7 @@ export default function App() {
   const [synthScale, setSynthScale] = useState<ScaleName>('continuous')
   const [unisonCount, setUnisonCount] = useState(2)
   const [detuneSpread, setDetuneSpread] = useState(7)
+  const [masterVolume, setMasterVolume] = useState(0.8)
   // FX state
   const [delayTime, setDelayTime] = useState(0.3)
   const [delayFeedback, setDelayFeedback] = useState(0.4)
@@ -229,6 +230,8 @@ export default function App() {
           onSimMouseUpdate={handleSimMouseUpdate}
           audioEnabled={audioEnabled}
           onAudioToggle={setAudioEnabled}
+          masterVolume={masterVolume}
+          onMasterVolume={(v) => { setMasterVolume(v); audio.setVolume(v) }}
           hideCursor={hideCursor}
           onCursorHideChange={setHideCursor}
           gravBodyPositions={gravBodyPositionsRef}

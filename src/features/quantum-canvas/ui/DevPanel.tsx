@@ -29,15 +29,14 @@ interface DevPanelProps {
   simMouseActive: boolean
   onSimMouseActiveChange: (value: boolean) => void
   onSimMouseUpdate: (x: number, y: number) => void
-  audioEnabled: boolean
-  onAudioToggle: (value: boolean) => void
+  audioEnabled: boolean; onAudioToggle: (v: boolean) => void
+  masterVolume: number; onMasterVolume: (v: number) => void
   hideCursor: boolean
   onCursorHideChange: (value: boolean) => void
   gravBodyPositions: MutableRefObject<{click: {x: number, y: number}, mouse: {x: number, y: number}} | null>
   canvasRef: MutableRefObject<HTMLCanvasElement | null>
   // Synth controls
-  synthWaveform: SynthWaveform
-  onSynthWaveform: (wf: SynthWaveform) => void
+  synthWaveform: SynthWaveform; onSynthWaveform: (wf: SynthWaveform) => void
   synthFilterQ: number
   onSynthFilterQ: (q: number) => void
   audioReactive: boolean
@@ -68,7 +67,7 @@ interface DevPanelProps {
   fftRef: MutableRefObject<FFTBands>
 }
 
-export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, hideCursor, onCursorHideChange, gravBodyPositions, canvasRef, synthWaveform, onSynthWaveform, synthFilterQ, onSynthFilterQ, audioReactive, onAudioReactive, synthScale, onSynthScale, unisonCount, onUnisonCount, detuneSpread, onDetuneSpread, delayTime, onDelayTime, delayFeedback, onDelayFeedback, delayMix, onDelayMix, reverbMix, onReverbMix, reverbDecay, onReverbDecay, distortion, onDistortion, autoDistortion, onAutoDistortion, fftSpawnEnabled, onFftSpawnEnabled, fftSpawnThreshold, onFftSpawnThreshold, fftSpawnRate, onFftSpawnRate, envAttack, onEnvAttack, envDecay, onEnvDecay, envSustain, onEnvSustain, envRelease, onEnvRelease, fftRef }: DevPanelProps) {
+export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, masterVolume, onMasterVolume, hideCursor, onCursorHideChange, gravBodyPositions, canvasRef, synthWaveform, onSynthWaveform, synthFilterQ, onSynthFilterQ, audioReactive, onAudioReactive, synthScale, onSynthScale, unisonCount, onUnisonCount, detuneSpread, onDetuneSpread, delayTime, onDelayTime, delayFeedback, onDelayFeedback, delayMix, onDelayMix, reverbMix, onReverbMix, reverbDecay, onReverbDecay, distortion, onDistortion, autoDistortion, onAutoDistortion, fftSpawnEnabled, onFftSpawnEnabled, fftSpawnThreshold, onFftSpawnThreshold, fftSpawnRate, onFftSpawnRate, envAttack, onEnvAttack, envDecay, onEnvDecay, envSustain, onEnvSustain, envRelease, onEnvRelease, fftRef }: DevPanelProps) {
   const [collapsed, setCollapsed] = useState(false)
   const sim = useAutoSim({ onSimClick, onSimMouseActiveChange, onSimMouseUpdate, zoomMode: tuning.zoomMode })
 
@@ -118,6 +117,7 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           const fullState = {
             ...tuning,
             audioEnabled,
+            masterVolume,
             synthWaveform,
             synthFilterQ,
             audioReactive,
@@ -162,6 +162,8 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           onUnisonCountChange={onUnisonCount}
           detuneSpread={detuneSpread}
           onDetuneSpreadChange={onDetuneSpread}
+          volume={masterVolume}
+          onVolumeChange={onMasterVolume}
           fftRef={fftRef}
         />
         <FXControls
@@ -326,6 +328,7 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           }
           // Restore audio settings
           if (loadedTuning.audioEnabled !== undefined) onAudioToggle(loadedTuning.audioEnabled)
+          if (loadedTuning.masterVolume !== undefined) onMasterVolume(loadedTuning.masterVolume)
           if (loadedTuning.synthWaveform) onSynthWaveform(loadedTuning.synthWaveform)
           if (loadedTuning.synthFilterQ !== undefined) onSynthFilterQ(loadedTuning.synthFilterQ)
           if (loadedTuning.audioReactive !== undefined) onAudioReactive(loadedTuning.audioReactive)

@@ -49,6 +49,7 @@ export interface ShaderTuning {
   zoomMode: number     // 0=manual, 1=adaptive, 2=adaptive+confinement
   // Audio / Synth
   audioEnabled?: boolean
+  masterVolume?: number  // 0-1 overall volume
   synthWaveform?: 'sine' | 'sawtooth' | 'square' | 'triangle'
   synthFilterQ?: number
   audioReactive?: boolean
@@ -117,6 +118,7 @@ export const DEFAULT_TUNING: ShaderTuning = {
   zoomMode: 0,
   // Audio defaults
   audioEnabled: false,
+  masterVolume: 0.8,
   synthWaveform: 'sine',
   synthFilterQ: 2.0,
   audioReactive: true,

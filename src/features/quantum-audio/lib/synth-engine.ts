@@ -33,11 +33,13 @@ interface UnisonVoice {
 interface EngineNodes {
   ctx: AudioContext
   masterGain: GainNode
+  masterVolume: GainNode
   mainPanner: StereoPannerNode
   voices: UnisonVoice[]
   voiceGain: GainNode
   filter: BiquadFilterNode
   analyser: AnalyserNode
+  notesGain: GainNode
   fftData: Uint8Array<ArrayBuffer>
   waveform: SynthWaveform
 }
@@ -66,19 +68,30 @@ export class SynthEngine {
     if (this.nodes) return
     const ctx = new AudioContext()
 
-    const masterGain = ctx.createGain()
-    masterGain.gain.value = 0
-    masterGain.connect(ctx.destination)
+    // Master volume — user-controlled overall level
+    const masterVolume = ctx.createGain()
+    masterVolume.gain.value = 0.8
+    masterVolume.connect(ctx.destination)
 
     const analyser = ctx.createAnalyser()
     analyser.fftSize = 256
     analyser.smoothingTimeConstant = 0.6
-    analyser.connect(masterGain)
+    analyser.connect(masterVolume)
     const fftData = new Uint8Array(analyser.frequencyBinCount)
+
+    // Energy-gated drone gain — continuous voices go through here
+    const masterGain = ctx.createGain()
+    masterGain.gain.value = 0
+    masterGain.connect(analyser)
+
+    // Notes gain — always on, for keyboard/click one-shot notes
+    const notesGain = ctx.createGain()
+    notesGain.gain.value = 1.0
+    notesGain.connect(analyser)
 
     const mainPanner = ctx.createStereoPanner()
     mainPanner.pan.value = 0
-    mainPanner.connect(analyser)
+    mainPanner.connect(masterGain)
 
     const filter = ctx.createBiquadFilter()
     filter.type = 'lowpass'
@@ -96,8 +109,8 @@ export class SynthEngine {
     const voices = this.buildVoices(ctx, voiceGain, 'sine', MIN_FREQ)
 
     this.nodes = {
-      ctx, masterGain, mainPanner, voices,
-      voiceGain, filter, analyser, fftData,
+      ctx, masterGain, masterVolume, mainPanner, voices,
+      voiceGain, filter, analyser, notesGain, fftData,
       waveform: 'sine',
     }
     this._active = true
@@ -143,6 +156,12 @@ export class SynthEngine {
   setReverbDecay(s: number): void { this.fx.setReverbDecay(s) }
   setDistortion(v: number): void { this.fx.setDistortion(v) }
   setAutoDistortion(on: boolean): void { this._autoDistortion = on }
+
+  setVolume(v: number): void {
+    const n = this.nodes
+    if (!n) return
+    n.masterVolume.gain.setTargetAtTime(Math.max(0, Math.min(1, v)), n.ctx.currentTime, 0.05)
+  }
 
   setEnvelope(a: number, d: number, s: number, r: number): void {
     this._envelope = {
@@ -284,7 +303,7 @@ export class SynthEngine {
     }
 
     noteFilter.connect(gain)
-    gain.connect(n.analyser)
+    gain.connect(n.notesGain)
 
     let released = false
     const doRelease = () => {
@@ -396,7 +415,7 @@ export class SynthEngine {
 
     src.connect(gain)
     gain.connect(panner)
-    panner.connect(n.analyser)
+    panner.connect(n.notesGain)
     src.start(now)
     src.stop(now + duration)
   }
