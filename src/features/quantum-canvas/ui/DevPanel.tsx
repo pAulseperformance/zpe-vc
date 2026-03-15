@@ -102,7 +102,22 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
         onAudioToggle={onAudioToggle}
         onCopy={(btn) => {
           const og = btn.innerText
-          navigator.clipboard.writeText(JSON.stringify(tuning, null, 2))
+          // Full snapshot: shader tuning + all synth/FX state
+          const fullState = {
+            ...tuning,
+            audioEnabled,
+            synthWaveform,
+            synthFilterQ,
+            audioReactive,
+            synthScale,
+            unisonCount,
+            detuneSpread,
+            delayTime, delayFeedback, delayMix,
+            reverbMix, reverbDecay,
+            distortion, autoDistortion,
+            hideCursor,
+          }
+          navigator.clipboard.writeText(JSON.stringify(fullState, null, 2))
           btn.innerText = 'COPIED'
           btn.classList.add('text-electric-purple')
           setTimeout(() => {
