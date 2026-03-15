@@ -156,8 +156,10 @@ void main() {
   // CATALYST EM WAVES — Interference + Lenz + Heat
   // ══════════════════════════════════════════
   vec3 catalystColorAdditive = BLACK;  // Old-style additive
-  float waveFieldSigned = 0.0;        // Signed field for interference
-  float waveFieldEnvelope = 0.0;      // Brightness envelope
+  float waveFieldSigned = 0.0;        // Signed EM field for interference
+  float waveFieldEnvelope = 0.0;      // EM brightness envelope
+  float gravFieldSigned = 0.0;        // Signed gravitational field for grav-wave interference
+  float gravFieldEnvelope = 0.0;      // Gravitational field envelope
   float heatResidual = 0.0;           // Energy memory trail
   vec2 lenzDisplacement = vec2(0.0);
   float spectrumAccum = 0.0;          // For chromatic dispersion base
@@ -239,10 +241,26 @@ void main() {
     // ── Lenz displacement ──
     vec2 dirToCenter = (rawDist > 0.001) ? normalize(cat - warpedUV) : vec2(0.0);
     // Energy-proportional lensing: E=mc² → more energy = stronger curvature
-    lenzDisplacement += dirToCenter * lenzMask * lenzDamping * uLenzStrength * (0.3 + eNorm * 0.7);
+    float lenzMag = lenzMask * lenzDamping * uLenzStrength * (0.3 + eNorm * 0.7);
+    lenzDisplacement += dirToCenter * lenzMag;
+
+    // ── Gravitational wave interference field ──
+    // Lower frequency than EM (gravitational waves have much longer wavelength)
+    float gravWave = sin(dist * uWaveFreq * 0.3 - age * 10.0);
+    gravFieldSigned += gravWave * lenzMag;
+    gravFieldEnvelope += abs(gravWave) * lenzMag;
   }
 
-  // ── Wave interference compositing ──
+  // ── Gravitational wave interference ──
+  // Two gravity sources can cancel, creating gravitational standing waves
+  float gravInterference = abs(gravFieldSigned);
+  float gravInterferenceFactor = (gravFieldEnvelope > 0.001)
+    ? pow(gravInterference / gravFieldEnvelope, 0.5) // Softer than EM (gravity is weaker)
+    : 1.0;
+  // Apply gravitational interference to lenz displacement (modulated by blend)
+  lenzDisplacement *= mix(1.0, gravInterferenceFactor, uInterferenceBlend);
+
+  // ── EM Wave interference compositing ──
   float interference = abs(waveFieldSigned);
   float cancellation = max(waveFieldEnvelope - interference, 0.0);
 
