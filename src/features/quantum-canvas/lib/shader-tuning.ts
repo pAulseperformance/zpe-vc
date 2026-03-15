@@ -466,7 +466,7 @@ export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
     viewScale: 2.695555547490532,
     zoomMode: 0,
     autoSim: {
-      active: true,
+      active: false,
       mode: 'gravity',
       rate: 10,
       clicksOn: true,
