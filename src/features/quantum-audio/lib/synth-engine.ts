@@ -164,6 +164,15 @@ export class SynthEngine {
     n.masterVolume.gain.setTargetAtTime(Math.max(0, Math.min(1, v)), n.ctx.currentTime, 0.05)
   }
 
+  /** Get a MediaStream tapped from the master output for recording */
+  getRecordingStream(): MediaStream | null {
+    const n = this.nodes
+    if (!n) return null
+    const dest = n.ctx.createMediaStreamDestination()
+    n.masterVolume.connect(dest)
+    return dest.stream
+  }
+
   setDroneVolume(v: number): void {
     this._droneVolumeScale = Math.max(0, Math.min(1, v))
   }

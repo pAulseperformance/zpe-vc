@@ -87,9 +87,13 @@ export function useSynth() {
     return getEngine().playNote(freq, velocity, sustained)
   }, [])
 
+  const getRecordingStream = useCallback((): MediaStream | null => {
+    return getEngine().getRecordingStream()
+  }, [])
+
   // Stable reference — prevents useEffect re-runs that kill sustained notes
   return useMemo(() => ({
-    start, stop, update, triggerClick, playNote,
+    start, stop, update, triggerClick, playNote, getRecordingStream,
     setWaveform, setFilterQ, setScale,
     setUnisonCount, setDetuneSpread,
     setDelayTime, setDelayFeedback, setDelayMix,
@@ -99,7 +103,7 @@ export function useSynth() {
     activeRef,
     fftRef: fftRef as MutableRefObject<FFTBands>,
   }), [
-    start, stop, update, triggerClick, playNote,
+    start, stop, update, triggerClick, playNote, getRecordingStream,
     setWaveform, setFilterQ, setScale,
     setUnisonCount, setDetuneSpread,
     setDelayTime, setDelayFeedback, setDelayMix,

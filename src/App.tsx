@@ -6,7 +6,7 @@ import { TerminalIntake } from '@/widgets/terminal-intake'
 import { DevModeButton } from '@/widgets/dev-mode-button/DevModeButton'
 import { useSynth, yToFreq } from '@/features/quantum-audio'
 import type { SynthWaveform, ScaleName } from '@/features/quantum-audio'
-import { useHandTracker, NoteOverlay, Looper } from '@/features/hand-tracking'
+import { useHandTracker, NoteOverlay, Looper, MidiOutput, AudioRecorder } from '@/features/hand-tracking'
 
 const IS_DEV = import.meta.env.DEV
 
@@ -39,6 +39,13 @@ export default function App() {
   const looperRef = useRef(new Looper())
   const [looperRecording, setLooperRecording] = useState(false)
   const [looperPlaying, setLooperPlaying] = useState(false)
+
+  // MIDI + Audio recorder
+  const midiRef = useRef(new MidiOutput())
+  const recorderRef = useRef(new AudioRecorder())
+  const [midiEnabled, setMidiEnabled] = useState(false)
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false)
+  const [performanceMode, setPerformanceMode] = useState(false)
 
   // Synth controls
   const [synthWaveform, setSynthWaveform] = useState<SynthWaveform>('sine')
@@ -222,16 +229,18 @@ export default function App() {
         handNoteRef.current = audio.playNote(freq, 0.8, true)
         simClickQueueRef.current.push({ x: primary.x, y: primary.y })
         setCurrentFreq(freq)
-        // Looper: record note on
+        if (midiEnabled) midiRef.current.noteOn(freq)
         if (looperRecording) looperRef.current.record({ type: 'noteOn', freq, x: primary.x, y: primary.y })
       } else if (!primary.pinching && wasPinchingRef.current) {
         handNoteRef.current?.release()
         handNoteRef.current = null
         setCurrentFreq(0)
+        if (midiEnabled) midiRef.current.noteOff()
         if (looperRecording) looperRef.current.record({ type: 'noteOff' })
       } else if (primary.pinching && handNoteRef.current) {
         handNoteRef.current.bend(freq)
         setCurrentFreq(freq)
+        if (midiEnabled) midiRef.current.pitchBend(freq)
         if (looperRecording) looperRef.current.record({ type: 'bend', freq })
       }
       wasPinchingRef.current = primary.pinching
@@ -314,7 +323,7 @@ export default function App() {
 
       {/* Dev Mode button — appears after terminal boot finishes */}
       <AnimatePresence>
-        {devUnlocked && !showDevPanel && (
+        {devUnlocked && !showDevPanel && !performanceMode && (
           <DevModeButton onClick={() => {
             setShowDevPanel(true)
             setIsForging(false) // Return to quantum canvas
@@ -323,7 +332,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* Dev panel — unlocked after rip or always in dev */}
-      {showDevPanel && (
+      {showDevPanel && !performanceMode && (
         <DevPanel
           tuning={tuning}
           energy={energyDisplay}
@@ -434,7 +443,45 @@ export default function App() {
               },
             },
           }}
+          performance={{
+            midiEnabled,
+            onMidiToggle: async () => {
+              if (midiEnabled) {
+                midiRef.current.allNotesOff()
+                setMidiEnabled(false)
+              } else {
+                const ok = await midiRef.current.init()
+                setMidiEnabled(ok)
+              }
+            },
+            isRecording: isRecordingAudio,
+            onRecordToggle: () => {
+              if (isRecordingAudio) {
+                recorderRef.current.stop()
+                setIsRecordingAudio(false)
+              } else {
+                const stream = audio.getRecordingStream()
+                if (stream) {
+                  recorderRef.current.startFromStream(stream)
+                  setIsRecordingAudio(true)
+                }
+              }
+            },
+            performanceMode,
+            onPerformanceToggle: () => setPerformanceMode(p => !p),
+          }}
         />
+      )}
+
+      {/* Performance mode: minimal UI — Escape to exit */}
+      {performanceMode && (
+        <button
+          onClick={() => setPerformanceMode(false)}
+          onKeyDown={(e) => { if (e.key === 'Escape') setPerformanceMode(false) }}
+          className="fixed top-4 right-4 z-[200] px-3 py-1.5 rounded-lg bg-black/60 backdrop-blur border border-purple-500/30 text-purple-400 text-xs font-bold hover:bg-black/80 transition-colors"
+        >
+          ESC — Exit Performance
+        </button>
       )}
     </div>
   )

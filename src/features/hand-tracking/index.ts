@@ -1,6 +1,8 @@
 export { useHandTracker } from './ui/useHandTracker'
 export { NoteOverlay } from './ui/NoteOverlay'
 export { Looper } from './lib/looper'
+export { MidiOutput } from './lib/midi-output'
+export { AudioRecorder } from './lib/audio-recorder'
 export { DEFAULT_HAND_MAPPING } from './lib/gesture-map'
 export type { HandState, DualHandState, HandMappingConfig, HandTarget, Gesture } from './ui/useHandTracker'
 export type { LoopEvent } from './lib/looper'

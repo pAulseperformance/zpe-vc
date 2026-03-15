@@ -91,9 +91,17 @@ interface DevPanelProps {
       eventCount: number
     }
   }
+  performance?: {
+    midiEnabled: boolean
+    onMidiToggle: () => void
+    isRecording: boolean
+    onRecordToggle: () => void
+    performanceMode: boolean
+    onPerformanceToggle: () => void
+  }
 }
 
-export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, masterVolume, onMasterVolume, droneVolume, onDroneVolume, notesVolume, onNotesVolume, hideCursor, onCursorHideChange, gravBodyPositions, canvasRef, synthWaveform, onSynthWaveform, synthFilterQ, onSynthFilterQ, audioReactive, onAudioReactive, synthScale, onSynthScale, unisonCount, onUnisonCount, detuneSpread, onDetuneSpread, delayTime, onDelayTime, delayFeedback, onDelayFeedback, delayMix, onDelayMix, reverbMix, onReverbMix, reverbDecay, onReverbDecay, distortion, onDistortion, autoDistortion, onAutoDistortion, fftSpawnEnabled, onFftSpawnEnabled, fftSpawnThreshold, onFftSpawnThreshold, fftSpawnRate, onFftSpawnRate, envAttack, onEnvAttack, envDecay, onEnvDecay, envSustain, onEnvSustain, envRelease, onEnvRelease, fftRef, handTracking }: DevPanelProps) {
+export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, masterVolume, onMasterVolume, droneVolume, onDroneVolume, notesVolume, onNotesVolume, hideCursor, onCursorHideChange, gravBodyPositions, canvasRef, synthWaveform, onSynthWaveform, synthFilterQ, onSynthFilterQ, audioReactive, onAudioReactive, synthScale, onSynthScale, unisonCount, onUnisonCount, detuneSpread, onDetuneSpread, delayTime, onDelayTime, delayFeedback, onDelayFeedback, delayMix, onDelayMix, reverbMix, onReverbMix, reverbDecay, onReverbDecay, distortion, onDistortion, autoDistortion, onAutoDistortion, fftSpawnEnabled, onFftSpawnEnabled, fftSpawnThreshold, onFftSpawnThreshold, fftSpawnRate, onFftSpawnRate, envAttack, onEnvAttack, envDecay, onEnvDecay, envSustain, onEnvSustain, envRelease, onEnvRelease, fftRef, handTracking, performance }: DevPanelProps) {
   const [collapsed, setCollapsed] = useState(false)
   const sim = useAutoSim({ onSimClick, onSimMouseActiveChange, onSimMouseUpdate, zoomMode: tuning.zoomMode })
 
@@ -353,6 +361,41 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
                   {handTracking.looper.eventCount > 0 && (
                     <span className="text-[0.5rem] text-cold-white-dim/30">{handTracking.looper.eventCount} events</span>
                   )}
+                </div>
+              )}
+              {/* Performance controls */}
+              {performance && (
+                <div className="flex items-center gap-1.5 mt-1">
+                  <button
+                    onClick={performance.onMidiToggle}
+                    className={`px-2 py-0.5 rounded text-[0.55rem] font-bold transition-colors ${
+                      performance.midiEnabled
+                        ? 'bg-blue-500/30 text-blue-400 border border-blue-500/50'
+                        : 'bg-white/5 text-cold-white-dim/50 border border-white/10 hover:bg-white/10'
+                    }`}
+                  >
+                    🎹 MIDI
+                  </button>
+                  <button
+                    onClick={performance.onRecordToggle}
+                    className={`px-2 py-0.5 rounded text-[0.55rem] font-bold transition-colors ${
+                      performance.isRecording
+                        ? 'bg-red-500/30 text-red-400 border border-red-500/50 animate-pulse'
+                        : 'bg-white/5 text-cold-white-dim/50 border border-white/10 hover:bg-white/10'
+                    }`}
+                  >
+                    {performance.isRecording ? '⏹ REC' : '🎙 REC'}
+                  </button>
+                  <button
+                    onClick={performance.onPerformanceToggle}
+                    className={`px-2 py-0.5 rounded text-[0.55rem] font-bold transition-colors ${
+                      performance.performanceMode
+                        ? 'bg-purple-500/30 text-purple-400 border border-purple-500/50'
+                        : 'bg-white/5 text-cold-white-dim/50 border border-white/10 hover:bg-white/10'
+                    }`}
+                  >
+                    🎭 Perform
+                  </button>
                 </div>
               )}
             </div>
