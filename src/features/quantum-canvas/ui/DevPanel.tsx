@@ -123,7 +123,9 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
             autoSim: {
               active: sim.simActive,
               mode: sim.simMode,
-              rate: sim.simRate
+              rate: sim.simRate,
+              clicksOn: sim.simClicksOn,
+              mouseOn: sim.simMouseOn,
             }
           } : {}),
           ripBlocked: wallRip
@@ -134,7 +136,8 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
             sim.setSimActive(loadedTuning.autoSim.active)
             sim.setSimMode(loadedTuning.autoSim.mode)
             sim.setSimRate(loadedTuning.autoSim.rate)
-            sim.setSimClicksOn(true)
+            sim.setSimClicksOn(loadedTuning.autoSim.clicksOn ?? true)
+            sim.setSimMouseOn(loadedTuning.autoSim.mouseOn ?? false)
           } else {
             sim.setSimActive(false)
           }
