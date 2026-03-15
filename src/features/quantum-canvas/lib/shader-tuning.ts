@@ -36,6 +36,9 @@ export interface ShaderTuning {
     rate: number
     clicksOn?: boolean
     mouseOn?: boolean
+    separation?: number
+    mouseSpeed?: number
+    mouseRadius?: number
   }
   ripBlocked?: boolean
   pointerHover?: boolean
@@ -44,6 +47,13 @@ export interface ShaderTuning {
   spinSpeed: number    // Parallax vortex rotation speed multiplier
   viewScale: number    // Camera zoom: 1.0=default, >1=zoomed out
   zoomMode: number     // 0=manual, 1=adaptive, 2=adaptive+confinement
+  // Audio / Synth
+  audioEnabled?: boolean
+  synthWaveform?: 'sine' | 'sawtooth' | 'square' | 'triangle'
+  synthFilterQ?: number
+  audioReactive?: boolean
+  // UI
+  hideCursor?: boolean
 }
 
 export const DEFAULT_TUNING: ShaderTuning = {
@@ -85,6 +95,13 @@ export const DEFAULT_TUNING: ShaderTuning = {
   spinSpeed: 1.0,
   viewScale: 1.0,
   zoomMode: 0,
+  // Audio defaults
+  audioEnabled: false,
+  synthWaveform: 'sine',
+  synthFilterQ: 2.0,
+  audioReactive: true,
+  // UI defaults
+  hideCursor: true,
 }
 
 export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {

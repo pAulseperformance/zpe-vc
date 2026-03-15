@@ -206,7 +206,7 @@ export function useQuantumAudio() {
     fftRef.current = { bass: s.bass, mid: s.mid, treble: s.treble }
   }, [])
 
-  /** Fire a click transient with ADSR envelope */
+  /** Fire a click transient — bypasses filter for full harmonic character */
   const triggerClick = useCallback((mapX: number = 0.5) => {
     const a = audioRef.current
     if (!a || !activeRef.current) return
@@ -214,35 +214,74 @@ export function useQuantumAudio() {
     const now = a.ctx.currentTime
     const clickOsc = a.ctx.createOscillator()
     const clickGain = a.ctx.createGain()
-    const clickFilter = a.ctx.createBiquadFilter()
 
     clickOsc.type = a.waveform
     clickOsc.frequency.value = 400 + Math.random() * 600
 
     // ADSR envelope
     clickGain.gain.setValueAtTime(0, now)
-    clickGain.gain.linearRampToValueAtTime(0.15, now + 0.01)   // Attack: 10ms
-    clickGain.gain.linearRampToValueAtTime(0.045, now + 0.06)  // Decay: 50ms → Sustain 0.3
-    clickGain.gain.linearRampToValueAtTime(0, now + 0.16)      // Release: 100ms
-
-    clickFilter.type = 'lowpass'
-    clickFilter.frequency.value = a.filter.frequency.value // Match current filter
-    clickFilter.Q.value = 1.0
+    clickGain.gain.linearRampToValueAtTime(0.12, now + 0.01)
+    clickGain.gain.linearRampToValueAtTime(0.04, now + 0.06)
+    clickGain.gain.linearRampToValueAtTime(0, now + 0.16)
 
     const panner = a.ctx.createStereoPanner()
     panner.pan.value = (mapX - 0.5) * 2.0
 
-    clickOsc.connect(clickFilter)
-    clickFilter.connect(clickGain)
+    clickOsc.connect(clickGain)
     clickGain.connect(panner)
-    panner.connect(a.analyser) // Route through analyser for FFT pickup
+    panner.connect(a.analyser)
 
     clickOsc.start(now)
     clickOsc.stop(now + 0.2)
   }, [])
 
+  /**
+   * Play a pitched note — uses current waveform + filter
+   * @param freq - Frequency in Hz
+   * @param velocity - 0-1 volume scaling
+   */
+  const playNote = useCallback((freq: number, velocity: number = 0.8) => {
+    const a = audioRef.current
+    if (!a || !activeRef.current) return
+
+    const now = a.ctx.currentTime
+    const osc = a.ctx.createOscillator()
+    const oscB = a.ctx.createOscillator()
+    const gain = a.ctx.createGain()
+    const noteFilter = a.ctx.createBiquadFilter()
+
+    osc.type = a.waveform
+    osc.frequency.value = freq
+    osc.detune.value = DETUNE_CENTS
+
+    oscB.type = a.waveform
+    oscB.frequency.value = freq
+    oscB.detune.value = -DETUNE_CENTS
+
+    noteFilter.type = 'lowpass'
+    noteFilter.frequency.value = a.filter.frequency.value
+    noteFilter.Q.value = a.filter.Q.value
+
+    const vol = velocity * 0.2
+    gain.gain.setValueAtTime(0, now)
+    gain.gain.linearRampToValueAtTime(vol, now + 0.015)
+    gain.gain.linearRampToValueAtTime(vol * 0.6, now + 0.1)
+    gain.gain.setValueAtTime(vol * 0.6, now + 0.25)
+    gain.gain.linearRampToValueAtTime(0, now + 0.5)
+
+    osc.connect(noteFilter)
+    oscB.connect(noteFilter)
+    noteFilter.connect(gain)
+    gain.connect(a.analyser)
+
+    osc.start(now)
+    oscB.start(now)
+    osc.stop(now + 0.55)
+    oscB.stop(now + 0.55)
+  }, [])
+
   return {
-    start, stop, update, triggerClick,
+    start, stop, update, triggerClick, playNote,
     setWaveform, setFilterQ,
     activeRef, fftRef,
   }

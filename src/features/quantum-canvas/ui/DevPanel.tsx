@@ -99,6 +99,18 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
         onCollapse={() => setCollapsed(true)}
       />
 
+      {audioEnabled && (
+        <SynthControls
+          waveform={synthWaveform}
+          onWaveformChange={onSynthWaveform}
+          filterQ={synthFilterQ}
+          onFilterQChange={onSynthFilterQ}
+          audioReactive={audioReactive}
+          onAudioReactiveChange={onAudioReactive}
+          fftRef={fftRef}
+        />
+      )}
+
       <EnergyMeter
         energy={energy}
         energyOverride={energyOverride}
@@ -171,9 +183,17 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
               rate: sim.simRate,
               clicksOn: sim.simClicksOn,
               mouseOn: sim.simMouseOn,
+              separation: sim.simSeparation,
+              mouseSpeed: sim.simMouseSpeed,
+              mouseRadius: sim.simMouseRadius,
             }
           } : {}),
-          ripBlocked: wallRip
+          ripBlocked: wallRip,
+          audioEnabled,
+          synthWaveform,
+          synthFilterQ,
+          audioReactive,
+          hideCursor,
         }}
         onChange={(loadedTuning) => {
           onChange(loadedTuning)
@@ -183,27 +203,25 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
             sim.setSimRate(loadedTuning.autoSim.rate)
             sim.setSimClicksOn(loadedTuning.autoSim.clicksOn ?? true)
             sim.setSimMouseOn(loadedTuning.autoSim.mouseOn ?? false)
+            sim.setSimSeparation(loadedTuning.autoSim.separation ?? 0.2)
+            sim.setSimMouseSpeed(loadedTuning.autoSim.mouseSpeed ?? 0.5)
+            sim.setSimMouseRadius(loadedTuning.autoSim.mouseRadius ?? 0.15)
           } else {
             sim.setSimActive(false)
           }
           if (loadedTuning.ripBlocked !== undefined) {
             onWallRipChange(loadedTuning.ripBlocked)
           }
+          // Restore audio settings
+          if (loadedTuning.audioEnabled !== undefined) onAudioToggle(loadedTuning.audioEnabled)
+          if (loadedTuning.synthWaveform) onSynthWaveform(loadedTuning.synthWaveform)
+          if (loadedTuning.synthFilterQ !== undefined) onSynthFilterQ(loadedTuning.synthFilterQ)
+          if (loadedTuning.audioReactive !== undefined) onAudioReactive(loadedTuning.audioReactive)
+          if (loadedTuning.hideCursor !== undefined) onCursorHideChange(loadedTuning.hideCursor)
         }}
         canvasRef={canvasRef}
       />
       <ExportControls canvasRef={canvasRef} />
-      {audioEnabled && (
-        <SynthControls
-          waveform={synthWaveform}
-          onWaveformChange={onSynthWaveform}
-          filterQ={synthFilterQ}
-          onFilterQChange={onSynthFilterQ}
-          audioReactive={audioReactive}
-          onAudioReactiveChange={onAudioReactive}
-          fftRef={fftRef}
-        />
-      )}
       <BarrierControls tuning={tuning} onChange={onChange} />
       <AutoSimControls sim={sim} />
 
