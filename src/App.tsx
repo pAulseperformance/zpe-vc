@@ -90,7 +90,10 @@ export default function App() {
       {/* Dev Mode button — appears after terminal boot finishes */}
       <AnimatePresence>
         {devUnlocked && !showDevPanel && (
-          <DevModeButton onClick={() => setShowDevPanel(true)} />
+          <DevModeButton onClick={() => {
+            setShowDevPanel(true)
+            setIsForging(false) // Return to quantum canvas
+          }} />
         )}
       </AnimatePresence>
 
