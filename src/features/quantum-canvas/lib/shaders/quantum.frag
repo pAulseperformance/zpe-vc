@@ -37,6 +37,7 @@ uniform float uInterferenceBlend;
 uniform float uHeatField;
 uniform float uIridescence;
 uniform float uPaletteMode; // 0 = physical, 1 = artistic, 2 = hybrid
+uniform float uStarField;   // 0 = off, 1 = full brightness
 
 // ─── Palette ───
 const vec3 BLACK     = vec3(0.0);
@@ -489,7 +490,7 @@ void main() {
   float starBright = smoothstep(0.03, 0.005, starDist) * step(0.85, starHash) * twinkle;
   // Star color temperature: warm white to blue-white
   vec3 starColor = mix(vec3(1.0, 0.95, 0.85), vec3(0.85, 0.92, 1.0), starHash2);
-  color += starColor * starBright * 0.15;
+  color += starColor * starBright * 0.15 * uStarField;
 
   float vDist = length(vUv - 0.5) * 1.6;
   float vignette = 1.0 - pow(vDist, 1.5);

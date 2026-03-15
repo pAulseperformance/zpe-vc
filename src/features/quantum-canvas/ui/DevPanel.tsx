@@ -21,6 +21,7 @@ export interface ShaderTuning {
   interferenceBlend: number
   iridescence: number
   paletteMode: number  // 0=physical, 1=artistic, 2=hybrid
+  starField: number    // 0=off, 1=full brightness
 }
 
 export const DEFAULT_TUNING: ShaderTuning = {
@@ -44,6 +45,7 @@ export const DEFAULT_TUNING: ShaderTuning = {
   interferenceBlend: 1,
   iridescence: 0.5,
   paletteMode: 1,  // Default: artistic
+  starField: 0,     // Off by default
 }
 
 const STORAGE_KEY = 'zpe-shader-presets'
@@ -77,6 +79,7 @@ const SLIDERS: SliderDef[] = [
   { key: 'heatIntensity', label: 'Heat Intensity', min: 0.0, max: 1.0, step: 0.05 },
   { key: 'interferenceBlend', label: 'Interference', min: 0.0, max: 1.0, step: 0.05 },
   { key: 'iridescence', label: 'Iridescence', min: 0.0, max: 1.0, step: 0.05 },
+  { key: 'starField', label: 'Star Field', min: 0.0, max: 1.0, step: 0.05 },
 ]
 
 /* ─── Preset helpers ─── */
