@@ -14,6 +14,7 @@ import { useRef, useCallback } from 'react'
 interface AudioState {
   ctx: AudioContext
   masterGain: GainNode
+  mainPanner: StereoPannerNode // Continuous panning for drone/shimmer based on mouse
   // Layer 1: base drone
   droneOsc: OscillatorNode
   droneGain: GainNode
@@ -41,6 +42,10 @@ export function useQuantumAudio() {
     masterGain.gain.value = 0
     masterGain.connect(ctx.destination)
 
+    const mainPanner = ctx.createStereoPanner()
+    mainPanner.pan.value = 0
+    mainPanner.connect(masterGain)
+
     // Layer 1: base drone (sine)
     const droneOsc = ctx.createOscillator()
     const droneGain = ctx.createGain()
@@ -48,7 +53,7 @@ export function useQuantumAudio() {
     droneOsc.frequency.value = BASE_FREQ
     droneGain.gain.value = 0
     droneOsc.connect(droneGain)
-    droneGain.connect(masterGain)
+    droneGain.connect(mainPanner)
     droneOsc.start()
 
     // Layer 2: harmonic shimmer (triangle — softer harmonics)
@@ -58,7 +63,7 @@ export function useQuantumAudio() {
     shimmerOsc.frequency.value = BASE_FREQ * SHIMMER_RATIO
     shimmerGain.gain.value = 0
     shimmerOsc.connect(shimmerGain)
-    shimmerGain.connect(masterGain)
+    shimmerGain.connect(mainPanner)
     shimmerOsc.start()
 
     // Layer 3: sub-bass pulse (sine, very low)
@@ -68,11 +73,11 @@ export function useQuantumAudio() {
     subOsc.frequency.value = BASE_FREQ * 0.5
     subGain.gain.value = 0
     subOsc.connect(subGain)
-    subGain.connect(masterGain)
+    subGain.connect(mainPanner)
     subOsc.start()
 
     audioRef.current = {
-      ctx, masterGain,
+      ctx, masterGain, mainPanner,
       droneOsc, droneGain,
       shimmerOsc, shimmerGain,
       subOsc, subGain,
@@ -105,8 +110,9 @@ export function useQuantumAudio() {
    * @param energy - Current energy level (0-300)
    * @param maxEnergy - Rip threshold for normalization
    * @param interferenceRatio - 0=full cancellation, 1=full constructive (from shader)
+   * @param mapX - X coordinate (0 to 1) for stereo panning of continuous layers
    */
-  const update = useCallback((energy: number, maxEnergy: number, interferenceRatio: number) => {
+  const update = useCallback((energy: number, maxEnergy: number, interferenceRatio: number, mapX: number = 0.5) => {
     const a = audioRef.current
     if (!a || !activeRef.current) return
 
@@ -127,10 +133,14 @@ export function useQuantumAudio() {
     // Sub-bass: pulses with energy, detuned slightly for organic feel
     a.subOsc.frequency.setTargetAtTime(droneFreq * 0.5 + Math.sin(now * 0.3) * 2, now, 0.2)
     a.subGain.gain.setTargetAtTime(eNorm * eNorm * 0.15, now, 0.1)
+
+    // Panning based on position (0 to 1 maps to -1 to 1)
+    const panTarget = (mapX - 0.5) * 2.0
+    a.mainPanner.pan.setTargetAtTime(panTarget, now, 0.1)
   }, [])
 
-  /** Fire a click transient — short burst on catalyst creation */
-  const triggerClick = useCallback(() => {
+  /** Fire a click transient — short burst on catalyst creation with localized panning */
+  const triggerClick = useCallback((mapX: number = 0.5) => {
     const a = audioRef.current
     if (!a || !activeRef.current) return
 
@@ -141,8 +151,14 @@ export function useQuantumAudio() {
     clickOsc.frequency.value = 800 + Math.random() * 400
     clickGain.gain.value = 0.1
     clickGain.gain.setTargetAtTime(0, now + 0.02, 0.04) // fast decay
+
+    const panner = a.ctx.createStereoPanner()
+    panner.pan.value = (mapX - 0.5) * 2.0
+    
     clickOsc.connect(clickGain)
-    clickGain.connect(a.masterGain)
+    clickGain.connect(panner)
+    panner.connect(a.masterGain)
+    
     clickOsc.start(now)
     clickOsc.stop(now + 0.15)
   }, [])

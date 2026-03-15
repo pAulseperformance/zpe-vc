@@ -4,6 +4,7 @@ interface AutoSimCallbacks {
   onSimClick: (x: number, y: number) => void
   onSimMouseActiveChange: (active: boolean) => void
   onSimMouseUpdate: (x: number, y: number) => void
+  zoomMode?: number
 }
 
 /**
@@ -18,7 +19,7 @@ export function useAutoSim(callbacks: AutoSimCallbacks) {
   const [simClicksOn, setSimClicksOn] = useState(true)
   const [simMouseOn, setSimMouseOn] = useState(false)
   const [simRate, setSimRate] = useState(2)
-  const [simMode, setSimMode] = useState<'single' | 'dual' | 'gravity'>('single')
+  const [simMode, setSimMode] = useState<'single' | 'dual' | 'cluster' | 'gravity'>('single')
   const [simSeparation, setSimSeparation] = useState(0.2)
   const [simMouseSpeed, setSimMouseSpeed] = useState(0.5)
   const [simMouseRadius, setSimMouseRadius] = useState(0.15)
@@ -92,9 +93,20 @@ export function useAutoSim(callbacks: AutoSimCallbacks) {
           grav.mouseVel.y += (dirY * force + centerForceY) * dt
           
           // Speed limit and friction
-          grav.mouseVel.x *= 0.99
           grav.mouseVel.y *= 0.99
           
+          // ── CONFINEMENT WALLS ──
+          if (callbacksRef.current.zoomMode === 2) {
+            const mDistY = grav.mousePos.y - 0.5
+            const mDistX = grav.mousePos.x - 0.5
+            const rad = Math.sqrt(mDistX*mDistX + mDistY*mDistY)
+            if (rad > 0.45) { // 90% from center
+              const force = (rad - 0.45) * 50.0
+              grav.mouseVel.x -= (mDistX / rad) * force * dt
+              grav.mouseVel.y -= (mDistY / rad) * force * dt
+            }
+          }
+
           grav.mousePos.x += grav.mouseVel.x * dt * st.simMouseSpeed
           grav.mousePos.y += grav.mouseVel.y * dt * st.simMouseSpeed
           
@@ -128,6 +140,18 @@ export function useAutoSim(callbacks: AutoSimCallbacks) {
         grav.clickVel.x *= 0.99
         grav.clickVel.y *= 0.99
         
+        // ── CONFINEMENT WALLS ──
+        if (callbacksRef.current.zoomMode === 2) {
+          const cDistY = grav.clickPos.y - 0.5
+          const cDistX = grav.clickPos.x - 0.5
+          const rad = Math.sqrt(cDistX*cDistX + cDistY*cDistY)
+          if (rad > 0.45) {
+            const force = (rad - 0.45) * 50.0
+            grav.clickVel.x -= (cDistX / rad) * force * dt
+            grav.clickVel.y -= (cDistY / rad) * force * dt
+          }
+        }
+        
         grav.clickPos.x += grav.clickVel.x * dt * Math.min(3.0, st.simRate * 0.3)
         grav.clickPos.y += grav.clickVel.y * dt * Math.min(3.0, st.simRate * 0.3)
       }
@@ -143,6 +167,12 @@ export function useAutoSim(callbacks: AutoSimCallbacks) {
             const half = st.simSeparation / 2
             onSimClick(0.5 - half, 0.5)
             onSimClick(0.5 + half, 0.5)
+          } else if (st.simMode === 'cluster') {
+            // Hexagon cluster
+            for (let i = 0; i < 6; i++) {
+              const angle = (i / 6) * Math.PI * 2 + (Date.now() * 0.001) // Rotate over time
+              onSimClick(0.5 + Math.cos(angle) * st.simSeparation, 0.5 + Math.sin(angle) * st.simSeparation)
+            }
           } else if (st.simMode === 'gravity') {
             onSimClick(grav.clickPos.x, grav.clickPos.y)
           }

@@ -57,10 +57,10 @@ export function AutoSimControls({ sim }: AutoSimControlsProps) {
             <div className="flex items-center gap-2">
               <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Mode</span>
               <button
-                onClick={() => setSimMode(simMode === 'single' ? 'dual' : simMode === 'dual' ? 'gravity' : 'single')}
+                onClick={() => setSimMode(simMode === 'single' ? 'dual' : simMode === 'dual' ? 'cluster' : simMode === 'cluster' ? 'gravity' : 'single')}
                 className="text-[0.55rem] text-cold-white-dim/50 hover:text-electric-purple border border-cold-white-dim/10 rounded px-2 py-0.5"
               >
-                {simMode === 'single' ? '● Single Origin' : simMode === 'dual' ? '●● Dual Origins' : '🌀 Gravity Orbit'}
+                {simMode === 'single' ? '● Single Origin' : simMode === 'dual' ? '●● Dual Origins' : simMode === 'cluster' ? '✨ Cluster' : '🌀 Gravity Orbit'}
               </button>
             </div>
             <div className="flex items-center gap-2">
@@ -69,7 +69,7 @@ export function AutoSimControls({ sim }: AutoSimControlsProps) {
                 onChange={e => setSimRate(Number(e.target.value))} className="flex-1 h-1 accent-electric-purple" />
               <span className="text-[0.55rem] w-10 text-right">{simRate}/s</span>
             </div>
-            {simMode === 'dual' && (
+            {(simMode === 'dual' || simMode === 'cluster') && (
               <div className="flex items-center gap-2">
                 <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Spread</span>
                 <input type="range" min={0.05} max={0.5} step={0.05} value={simSeparation}

@@ -24,16 +24,17 @@ interface Catalyst {
 interface ShaderPlaneProps {
   onRip: () => void
   tuning: ShaderTuning
-  onEnergyChange: (energy: number, interferenceRatio: number) => void
+  onEnergyChange: (energy: number, interferenceRatio: number, mouseX: number) => void
   energyOverride: number | null
   simClickQueue: MutableRefObject<Array<{x: number, y: number}>>
   simMouseActive: boolean
   simMousePos: MutableRefObject<{x: number, y: number}>
   gravBodyPositions: MutableRefObject<{click: {x: number, y: number}, mouse: {x: number, y: number}} | null>
   onZoomChange: (delta: number) => void
+  onManualClick?: (x: number, y: number) => void
 }
 
-function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange }: ShaderPlaneProps) {
+function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick }: ShaderPlaneProps) {
   const meshRef = useRef<THREE.Mesh>(null)
   const { size } = useThree()
 
@@ -114,9 +115,10 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
         const cats = catalystsRef.current
         cats.push({ x: e.uv.x, y: e.uv.y, time: -1 })
         if (cats.length > maxW) cats.shift()
+        onManualClick?.(e.uv.x, e.uv.y)
       }
     },
-    []
+    [onManualClick]
   )
 
   const onPointerLeave = useCallback(() => {
@@ -322,16 +324,17 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
 interface QuantumCanvasProps {
   onRip: () => void
   tuning: ShaderTuning
-  onEnergyChange: (energy: number, interferenceRatio: number) => void
+  onEnergyChange: (energy: number, interferenceRatio: number, mouseX: number) => void
   energyOverride: number | null
   simClickQueue: MutableRefObject<Array<{x: number, y: number}>>
   simMouseActive: boolean
   simMousePos: MutableRefObject<{x: number, y: number}>
   gravBodyPositions: MutableRefObject<{click: {x: number, y: number}, mouse: {x: number, y: number}} | null>
   onZoomChange: (delta: number) => void
+  onManualClick?: (x: number, y: number) => void
 }
 
-export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange }: QuantumCanvasProps) {
+export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick }: QuantumCanvasProps) {
   return (
     <Canvas
       gl={{ antialias: false, alpha: false, powerPreference: 'high-performance' }}
@@ -339,7 +342,7 @@ export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, s
       dpr={[1, 1.5]}
       style={{ background: '#000000', cursor: 'none' }}
     >
-      <ShaderPlane onRip={onRip} tuning={tuning} onEnergyChange={onEnergyChange} energyOverride={energyOverride} simClickQueue={simClickQueue} simMouseActive={simMouseActive} simMousePos={simMousePos} gravBodyPositions={gravBodyPositions} onZoomChange={onZoomChange} />
+      <ShaderPlane onRip={onRip} tuning={tuning} onEnergyChange={onEnergyChange} energyOverride={energyOverride} simClickQueue={simClickQueue} simMouseActive={simMouseActive} simMousePos={simMousePos} gravBodyPositions={gravBodyPositions} onZoomChange={onZoomChange} onManualClick={onManualClick} />
       <EffectComposer>
         <Bloom
           intensity={1.5}

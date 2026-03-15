@@ -42,7 +42,7 @@ export default function App() {
 
   const handleSimClick = useCallback((x: number, y: number) => {
     simClickQueueRef.current.push({ x, y })
-    audio.triggerClick()
+    audio.triggerClick(x)
   }, [audio])
 
   const handleSimMouseUpdate = useCallback((x: number, y: number) => {
@@ -51,15 +51,15 @@ export default function App() {
 
   // Throttle energy display updates to ~10fps to avoid re-render spam
   const lastUpdateRef = useRef(0)
-  const handleEnergyChange = useCallback((energy: number, interferenceRatio: number) => {
+  const handleEnergyChange = useCallback((energy: number, interferenceRatio: number, mouseX: number) => {
     energyRef.current = energy
     const now = Date.now()
     if (now - lastUpdateRef.current > 100) {
       lastUpdateRef.current = now
       setEnergyDisplay(energy)
     }
-    // Update audio per frame — interferenceRatio modulates shimmer volume
-    audio.update(energy, tuning.ripThreshold, interferenceRatio)
+    // Update audio per frame — interferenceRatio modulates shimmer volume, mouseX for spatial panning
+    audio.update(energy, tuning.ripThreshold, interferenceRatio, mouseX)
   }, [audio, tuning.ripThreshold])
 
   const handleZoomChange = useCallback((delta: number) => {
@@ -95,6 +95,7 @@ export default function App() {
             simMousePos={simMousePosRef}
             gravBodyPositions={gravBodyPositionsRef}
             onZoomChange={handleZoomChange}
+            onManualClick={(x, y) => audio.triggerClick(x)}
           />
         </Suspense>
       </motion.div>

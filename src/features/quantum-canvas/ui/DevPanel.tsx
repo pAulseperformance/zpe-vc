@@ -33,7 +33,7 @@ interface DevPanelProps {
 
 export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, hideCursor, onCursorHideChange, gravBodyPositions }: DevPanelProps) {
   const [collapsed, setCollapsed] = useState(false)
-  const sim = useAutoSim({ onSimClick, onSimMouseActiveChange, onSimMouseUpdate })
+  const sim = useAutoSim({ onSimClick, onSimMouseActiveChange, onSimMouseUpdate, zoomMode: tuning.zoomMode })
 
   // Bridge gravity body positions to parent for adaptive zoom
   useEffect(() => {

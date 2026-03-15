@@ -32,7 +32,7 @@ export interface ShaderTuning {
   // Preset Metadata (not sent to shader)
   autoSim?: {
     active: boolean
-    mode: 'single' | 'dual' | 'gravity'
+    mode: 'single' | 'dual' | 'gravity' | 'cluster'
     rate: number
     clicksOn?: boolean
     mouseOn?: boolean
@@ -361,6 +361,25 @@ export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
       rate: 10,
       clicksOn: true,
       mouseOn: true,
+    },
+    ripBlocked: true,
+  },
+  'Galaxy Cluster': {
+    ...DEFAULT_TUNING,
+    paletteMode: 2, // Hybrid
+    waveSpeed: 0.3,
+    waveFreq: 150,
+    starField: 0.8,
+    emDamping: 1.2,
+    gravDamping: 0.5,
+    viewScale: 2.5,
+    zoomMode: 0,
+    autoSim: {
+      active: true,
+      mode: 'cluster',
+      rate: 8,
+      clicksOn: true,
+      mouseOn: false,
     },
     ripBlocked: true,
   },
