@@ -51,6 +51,7 @@ export class SynthEngine {
   private _detuneSpread = 7 // cents total spread
   private _currentFreq = MIN_FREQ
   private _autoDistortion = false
+  private _envelope = { attack: 0.015, decay: 0.085, sustain: 0.6, release: 0.25 }
   readonly fx = new FXChain()
 
   /** Current FFT band levels (read per-frame) */
@@ -142,6 +143,15 @@ export class SynthEngine {
   setReverbDecay(s: number): void { this.fx.setReverbDecay(s) }
   setDistortion(v: number): void { this.fx.setDistortion(v) }
   setAutoDistortion(on: boolean): void { this._autoDistortion = on }
+
+  setEnvelope(a: number, d: number, s: number, r: number): void {
+    this._envelope = {
+      attack: Math.max(0.001, a),
+      decay: Math.max(0.01, d),
+      sustain: Math.max(0, Math.min(1, s)),
+      release: Math.max(0.01, r),
+    }
+  }
 
   setUnisonCount(count: number): void {
     const clamped = Math.max(1, Math.min(7, Math.round(count)))
@@ -242,11 +252,14 @@ export class SynthEngine {
 
     const gain = n.ctx.createGain()
     const vol = velocity * 0.2
+    const { attack, decay, sustain, release } = this._envelope
+    const totalDuration = attack + decay + release + 0.05
+
     gain.gain.setValueAtTime(0, now)
-    gain.gain.linearRampToValueAtTime(vol, now + 0.015)
-    gain.gain.linearRampToValueAtTime(vol * 0.6, now + 0.1)
-    gain.gain.setValueAtTime(vol * 0.6, now + 0.25)
-    gain.gain.linearRampToValueAtTime(0, now + 0.5)
+    gain.gain.linearRampToValueAtTime(vol, now + attack)
+    gain.gain.linearRampToValueAtTime(vol * sustain, now + attack + decay)
+    gain.gain.setValueAtTime(vol * sustain, now + attack + decay + 0.05)
+    gain.gain.linearRampToValueAtTime(0, now + totalDuration)
 
     // Spawn unison voices for this note
     const count = this._unisonCount
@@ -262,7 +275,7 @@ export class SynthEngine {
       osc.connect(vPan)
       vPan.connect(noteFilter)
       osc.start(now)
-      osc.stop(now + 0.55)
+      osc.stop(now + totalDuration + 0.05)
     }
 
     noteFilter.connect(gain)

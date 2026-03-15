@@ -67,6 +67,11 @@ export interface ShaderTuning {
   fftSpawnEnabled?: boolean  // Bass hits auto-spawn waves
   fftSpawnThreshold?: number // Bass level 0-1 to trigger (default 0.5)
   fftSpawnRate?: number      // Min ms between spawns (default 150)
+  // Envelope
+  envAttack?: number   // seconds (0.001-0.5)
+  envDecay?: number    // seconds (0.01-1)
+  envSustain?: number  // 0-1
+  envRelease?: number  // seconds (0.01-2)
   // UI
   hideCursor?: boolean
 }
@@ -128,6 +133,10 @@ export const DEFAULT_TUNING: ShaderTuning = {
   fftSpawnEnabled: false,
   fftSpawnThreshold: 0.5,
   fftSpawnRate: 150,
+  envAttack: 0.015,
+  envDecay: 0.085,
+  envSustain: 0.6,
+  envRelease: 0.25,
   // UI defaults
   hideCursor: true,
 }

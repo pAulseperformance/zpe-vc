@@ -9,6 +9,7 @@ import { BarrierControls } from './BarrierControls'
 import { ExportControls } from './ExportControls'
 import { SynthControls } from './SynthControls'
 import { FXControls } from './FXControls'
+import { EnvelopeControls } from './EnvelopeControls'
 import { SliderGroup } from './SliderGroup'
 import type { SynthWaveform, FFTBands, ScaleName } from '@/features/quantum-audio'
 
@@ -59,10 +60,15 @@ interface DevPanelProps {
   fftSpawnEnabled: boolean; onFftSpawnEnabled: (v: boolean) => void
   fftSpawnThreshold: number; onFftSpawnThreshold: (v: number) => void
   fftSpawnRate: number; onFftSpawnRate: (v: number) => void
+  // Envelope
+  envAttack: number; onEnvAttack: (v: number) => void
+  envDecay: number; onEnvDecay: (v: number) => void
+  envSustain: number; onEnvSustain: (v: number) => void
+  envRelease: number; onEnvRelease: (v: number) => void
   fftRef: MutableRefObject<FFTBands>
 }
 
-export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, hideCursor, onCursorHideChange, gravBodyPositions, canvasRef, synthWaveform, onSynthWaveform, synthFilterQ, onSynthFilterQ, audioReactive, onAudioReactive, synthScale, onSynthScale, unisonCount, onUnisonCount, detuneSpread, onDetuneSpread, delayTime, onDelayTime, delayFeedback, onDelayFeedback, delayMix, onDelayMix, reverbMix, onReverbMix, reverbDecay, onReverbDecay, distortion, onDistortion, autoDistortion, onAutoDistortion, fftSpawnEnabled, onFftSpawnEnabled, fftSpawnThreshold, onFftSpawnThreshold, fftSpawnRate, onFftSpawnRate, fftRef }: DevPanelProps) {
+export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, hideCursor, onCursorHideChange, gravBodyPositions, canvasRef, synthWaveform, onSynthWaveform, synthFilterQ, onSynthFilterQ, audioReactive, onAudioReactive, synthScale, onSynthScale, unisonCount, onUnisonCount, detuneSpread, onDetuneSpread, delayTime, onDelayTime, delayFeedback, onDelayFeedback, delayMix, onDelayMix, reverbMix, onReverbMix, reverbDecay, onReverbDecay, distortion, onDistortion, autoDistortion, onAutoDistortion, fftSpawnEnabled, onFftSpawnEnabled, fftSpawnThreshold, onFftSpawnThreshold, fftSpawnRate, onFftSpawnRate, envAttack, onEnvAttack, envDecay, onEnvDecay, envSustain, onEnvSustain, envRelease, onEnvRelease, fftRef }: DevPanelProps) {
   const [collapsed, setCollapsed] = useState(false)
   const sim = useAutoSim({ onSimClick, onSimMouseActiveChange, onSimMouseUpdate, zoomMode: tuning.zoomMode })
 
@@ -120,6 +126,7 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
             reverbMix, reverbDecay,
             distortion, autoDistortion,
             fftSpawnEnabled, fftSpawnThreshold, fftSpawnRate,
+            envAttack, envDecay, envSustain, envRelease,
             hideCursor,
           }
           navigator.clipboard.writeText(JSON.stringify(fullState, null, 2))
@@ -195,6 +202,12 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
             </>
           )}
         </div>
+        <EnvelopeControls
+          attack={envAttack} onAttackChange={onEnvAttack}
+          decay={envDecay} onDecayChange={onEnvDecay}
+          sustain={envSustain} onSustainChange={onEnvSustain}
+          release={envRelease} onReleaseChange={onEnvRelease}
+        />
         </>
       )}
 
@@ -324,6 +337,10 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           if (loadedTuning.fftSpawnEnabled !== undefined) onFftSpawnEnabled(loadedTuning.fftSpawnEnabled)
           if (loadedTuning.fftSpawnThreshold !== undefined) onFftSpawnThreshold(loadedTuning.fftSpawnThreshold)
           if (loadedTuning.fftSpawnRate !== undefined) onFftSpawnRate(loadedTuning.fftSpawnRate)
+          if (loadedTuning.envAttack !== undefined) onEnvAttack(loadedTuning.envAttack)
+          if (loadedTuning.envDecay !== undefined) onEnvDecay(loadedTuning.envDecay)
+          if (loadedTuning.envSustain !== undefined) onEnvSustain(loadedTuning.envSustain)
+          if (loadedTuning.envRelease !== undefined) onEnvRelease(loadedTuning.envRelease)
           if (loadedTuning.hideCursor !== undefined) onCursorHideChange(loadedTuning.hideCursor)
         }}
         canvasRef={canvasRef}

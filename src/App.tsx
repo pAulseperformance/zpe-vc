@@ -45,6 +45,11 @@ export default function App() {
   const [fftSpawnThreshold, setFftSpawnThreshold] = useState(0.5)
   const [fftSpawnRate, setFftSpawnRate] = useState(150)
   const fftSpawnCooldownRef = useRef(0)
+  // Envelope state
+  const [envAttack, setEnvAttack] = useState(0.015)
+  const [envDecay, setEnvDecay] = useState(0.085)
+  const [envSustain, setEnvSustain] = useState(0.6)
+  const [envRelease, setEnvRelease] = useState(0.25)
 
   // Dev mode — unlocked after rip boot sequence OR always in dev
   const [devUnlocked, setDevUnlocked] = useState(IS_DEV)
@@ -237,6 +242,14 @@ export default function App() {
           onFftSpawnThreshold={setFftSpawnThreshold}
           fftSpawnRate={fftSpawnRate}
           onFftSpawnRate={setFftSpawnRate}
+          envAttack={envAttack}
+          onEnvAttack={(v) => { setEnvAttack(v); audio.setEnvelope(v, envDecay, envSustain, envRelease) }}
+          envDecay={envDecay}
+          onEnvDecay={(v) => { setEnvDecay(v); audio.setEnvelope(envAttack, v, envSustain, envRelease) }}
+          envSustain={envSustain}
+          onEnvSustain={(v) => { setEnvSustain(v); audio.setEnvelope(envAttack, envDecay, v, envRelease) }}
+          envRelease={envRelease}
+          onEnvRelease={(v) => { setEnvRelease(v); audio.setEnvelope(envAttack, envDecay, envSustain, v) }}
           fftRef={audio.fftRef}
         />
       )}
