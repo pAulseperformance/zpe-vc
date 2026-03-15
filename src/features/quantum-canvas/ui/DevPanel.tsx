@@ -140,9 +140,11 @@ interface DevPanelProps {
   simMouseActive: boolean
   onSimMouseActiveChange: (value: boolean) => void
   onSimMouseUpdate: (x: number, y: number) => void
+  audioEnabled: boolean
+  onAudioToggle: (value: boolean) => void
 }
 
-export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate }: DevPanelProps) {
+export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle }: DevPanelProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [presets, setPresets] = useState<PresetMap>(loadPresets)
   const [presetName, setPresetName] = useState('')
@@ -245,6 +247,13 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           ⚙ Shader Tuning
         </span>
         <div className="flex gap-2">
+          <button
+            onClick={() => onAudioToggle(!audioEnabled)}
+            className={`text-[0.7rem] ${audioEnabled ? 'text-electric-purple' : 'text-cold-white-dim/40'} hover:text-electric-purple`}
+            title={audioEnabled ? 'Mute audio' : 'Enable audio feedback'}
+          >
+            {audioEnabled ? '🔊' : '🔇'}
+          </button>
           <button onClick={handleLog} className="text-cold-white-dim/40 hover:text-cold-white text-[0.6rem] uppercase">Log</button>
           <button onClick={handleReset} className="text-cold-white-dim/40 hover:text-cold-white text-[0.6rem] uppercase">Reset</button>
           <button onClick={() => setCollapsed(true)} className="text-cold-white-dim/40 hover:text-cold-white">×</button>
