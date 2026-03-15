@@ -178,6 +178,41 @@ export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
       rate: 10,
     },
     ripBlocked: true,
+  },
+  'Starburst': {
+    ...DEFAULT_TUNING,
+    paletteMode: 1, // Artistic
+    wavelength: 2,  // Visible / HUMAN
+    waveSpeed: 0.10,
+    waveFreq: 7500,
+    waveWidth: 5,
+    emDamping: 6.7,
+    gravDamping: 0.05,
+    waveLifetime: 1,
+    maxWaves: 40,
+    lenzStrength: 0,
+    lenzWake: 4.19,
+    hoverRadius: 0.7,
+    energyDecay: 2,
+    velocityMult: 5,
+    clickSpike: 5,
+    ripThreshold: 30,
+    parallaxDepth: 0.86,
+    heatDecay: 56,
+    heatAttack: 35,
+    heatIntensity: 0.45,
+    interferenceBlend: 3.65,
+    iridescence: 0,
+    starField: 19.2,
+    hoverWarp: 0,
+    spinSpeed: 19.5,
+    godMode: true,
+    autoSim: {
+      active: true,
+      mode: 'single',
+      rate: 10,
+    },
+    ripBlocked: true,
   }
 }
 
