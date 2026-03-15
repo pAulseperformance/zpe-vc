@@ -20,22 +20,22 @@ export interface ShaderTuning {
 }
 
 export const DEFAULT_TUNING: ShaderTuning = {
-  waveSpeed: 0.6,
-  waveFreq: 60.0,
-  waveWidth: 0.025,
-  waveDamping: 3.5,
-  waveLifetime: 6.0,
-  lenzStrength: 0.06,
-  lenzWake: 0.12,
-  hoverRadius: 0.25,
-  energyDecay: 12.0,
-  velocityMult: 15.0,
-  clickSpike: 20.0,
-  ripThreshold: 100.0,
-  parallaxDepth: 0.04,
-  heatDecay: 1.5,
-  heatIntensity: 0.2,
-  interferenceBlend: 1.0,
+  waveSpeed: 1.15,
+  waveFreq: 150,
+  waveWidth: 0.1,
+  waveDamping: 0.5,
+  waveLifetime: 15,
+  lenzStrength: 0.5,
+  lenzWake: 0.6,
+  hoverRadius: 0.05,
+  energyDecay: 30,
+  velocityMult: 30,
+  clickSpike: 10,
+  ripThreshold: 200,
+  parallaxDepth: 0.15,
+  heatDecay: 0.2,
+  heatIntensity: 1,
+  interferenceBlend: 1,
 }
 
 const STORAGE_KEY = 'zpe-shader-presets'
