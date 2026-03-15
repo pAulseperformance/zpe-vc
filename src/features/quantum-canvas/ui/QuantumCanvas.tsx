@@ -6,34 +6,25 @@ import * as THREE from 'three'
 import vertexShader from '../lib/shaders/quantum.vert'
 import fragmentShader from '../lib/shaders/quantum.frag'
 
-/* ─── Callback types ─── */
-
-export interface SandboxCallbacks {
-  onFirstHover: () => void
-  onRip: () => void
-}
-
 /* ─── Constants ─── */
-const ENERGY_DECAY_RATE = 8.0       // Energy lost per second (idle decay)
-const VELOCITY_ENERGY_MULT = 40.0   // Energy gained per unit of mouse velocity
-const CLICK_ENERGY_SPIKE = 25.0     // Energy added per click
-const RIP_THRESHOLD = 100.0         // Energy level that triggers the Rip
+const ENERGY_DECAY_RATE = 8.0
+const VELOCITY_ENERGY_MULT = 40.0
+const CLICK_ENERGY_SPIKE = 25.0
+const RIP_THRESHOLD = 100.0
 
 /* ─── Shader Plane ─── */
 
 interface ShaderPlaneProps {
-  callbacks: SandboxCallbacks
+  onRip: () => void
 }
 
-function ShaderPlane({ callbacks }: ShaderPlaneProps) {
+function ShaderPlane({ onRip }: ShaderPlaneProps) {
   const meshRef = useRef<THREE.Mesh>(null)
   const { size } = useThree()
 
-  // Interaction state — all refs, zero re-renders
   const mouseRef = useRef(new THREE.Vector2(0.5, 0.5))
   const prevMouseRef = useRef(new THREE.Vector2(0.5, 0.5))
   const energyRef = useRef(0)
-  const hasHoveredRef = useRef(false)
   const hasRippedRef = useRef(false)
   const ripFlashRef = useRef(0)
 
@@ -49,23 +40,17 @@ function ShaderPlane({ callbacks }: ShaderPlaneProps) {
     []
   )
 
-  // ── Pointer handlers ──
   const onPointerMove = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
       if (e.uv) {
         prevMouseRef.current.copy(mouseRef.current)
         mouseRef.current.set(e.uv.x, e.uv.y)
       }
-      if (!hasHoveredRef.current) {
-        hasHoveredRef.current = true
-        callbacks.onFirstHover()
-      }
     },
-    [callbacks]
+    []
   )
 
   const onPointerDown = useCallback(() => {
-    // Massive energy spike on click
     energyRef.current += CLICK_ENERGY_SPIKE
   }, [])
 
@@ -73,36 +58,28 @@ function ShaderPlane({ callbacks }: ShaderPlaneProps) {
     prevMouseRef.current.copy(mouseRef.current)
   }, [])
 
-  // ── Frame loop ──
   useFrame((state, delta) => {
     const mat = meshRef.current?.material as THREE.ShaderMaterial | undefined
     if (!mat) return
 
-    // Calculate mouse velocity (distance moved this frame)
     const velocity = mouseRef.current.distanceTo(prevMouseRef.current)
     prevMouseRef.current.copy(mouseRef.current)
 
-    // Add velocity-based energy
     energyRef.current += velocity * VELOCITY_ENERGY_MULT
-
-    // Constant decay toward 0
     energyRef.current -= ENERGY_DECAY_RATE * delta
     energyRef.current = Math.max(0, energyRef.current)
 
-    // Check Rip threshold
     if (energyRef.current >= RIP_THRESHOLD && !hasRippedRef.current) {
       hasRippedRef.current = true
       ripFlashRef.current = 1.0
-      callbacks.onRip()
+      onRip()
     }
 
-    // Decay rip flash
     if (ripFlashRef.current > 0) {
-      ripFlashRef.current -= delta * 2.0 // Fast decay ~0.5s
+      ripFlashRef.current -= delta * 2.0
       if (ripFlashRef.current < 0) ripFlashRef.current = 0
     }
 
-    // Push uniforms
     mat.uniforms.uTime.value = state.clock.elapsedTime
     mat.uniforms.uMouse.value.copy(mouseRef.current)
     mat.uniforms.uEnergy.value = energyRef.current
@@ -136,10 +113,10 @@ function ShaderPlane({ callbacks }: ShaderPlaneProps) {
 /* ─── Public Canvas ─── */
 
 interface QuantumCanvasProps {
-  callbacks: SandboxCallbacks
+  onRip: () => void
 }
 
-export function QuantumCanvas({ callbacks }: QuantumCanvasProps) {
+export function QuantumCanvas({ onRip }: QuantumCanvasProps) {
   return (
     <Canvas
       gl={{ antialias: false, alpha: false, powerPreference: 'high-performance' }}
@@ -147,7 +124,7 @@ export function QuantumCanvas({ callbacks }: QuantumCanvasProps) {
       dpr={[1, 1.5]}
       style={{ background: '#000000', cursor: 'crosshair' }}
     >
-      <ShaderPlane callbacks={callbacks} />
+      <ShaderPlane onRip={onRip} />
       <EffectComposer>
         <Bloom
           intensity={1.2}
