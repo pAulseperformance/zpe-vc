@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 export interface ShaderTuning {
   waveSpeed: number
@@ -19,6 +19,7 @@ export interface ShaderTuning {
   heatDecay: number
   heatIntensity: number
   interferenceBlend: number
+  iridescence: number
 }
 
 export const DEFAULT_TUNING: ShaderTuning = {
@@ -40,6 +41,7 @@ export const DEFAULT_TUNING: ShaderTuning = {
   heatDecay: 0.2,
   heatIntensity: 1,
   interferenceBlend: 1,
+  iridescence: 0.5,
 }
 
 const STORAGE_KEY = 'zpe-shader-presets'
@@ -72,6 +74,7 @@ const SLIDERS: SliderDef[] = [
   { key: 'heatDecay', label: 'Heat Decay', min: 0.2, max: 5.0, step: 0.1 },
   { key: 'heatIntensity', label: 'Heat Intensity', min: 0.0, max: 1.0, step: 0.05 },
   { key: 'interferenceBlend', label: 'Interference', min: 0.0, max: 1.0, step: 0.05 },
+  { key: 'iridescence', label: 'Iridescence', min: 0.0, max: 1.0, step: 0.05 },
 ]
 
 /* ─── Preset helpers ─── */
@@ -122,12 +125,70 @@ interface DevPanelProps {
   tuning: ShaderTuning
   energy: number
   onChange: (tuning: ShaderTuning) => void
+  energyOverride: number | null
+  onEnergyOverride: (value: number | null) => void
+  onSimClick: (x: number, y: number) => void
+  wallRip: boolean
+  onWallRipChange: (value: boolean) => void
+  simMouseActive: boolean
+  onSimMouseActiveChange: (value: boolean) => void
+  onSimMouseUpdate: (x: number, y: number) => void
 }
 
-export function DevPanel({ tuning, energy, onChange }: DevPanelProps) {
+export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate }: DevPanelProps) {
   const [collapsed, setCollapsed] = useState(false)
   const [presets, setPresets] = useState<PresetMap>(loadPresets)
   const [presetName, setPresetName] = useState('')
+  const [simClicksOn, setSimClicksOn] = useState(true)
+  const [simMouseOn, setSimMouseOn] = useState(false)
+  const [simActive, setSimActive] = useState(false)
+  const [simRate, setSimRate] = useState(2)
+  const [simMode, setSimMode] = useState<'single' | 'dual'>('single')
+  const [simSeparation, setSimSeparation] = useState(0.2)
+  const [simMouseSpeed, setSimMouseSpeed] = useState(0.5)
+  const [simMouseRadius, setSimMouseRadius] = useState(0.15)
+  const simTickRef = useRef(0)
+  const simMouseFrameRef = useRef(0)
+
+  // Auto-sim click interval
+  useEffect(() => {
+    if (!simActive || !simClicksOn) return
+    const interval = setInterval(() => {
+      if (simMode === 'single') {
+        onSimClick(0.5, 0.5)
+      } else {
+        const half = simSeparation / 2
+        if (simTickRef.current % 2 === 0) {
+          onSimClick(0.5 - half, 0.5)
+        } else {
+          onSimClick(0.5 + half, 0.5)
+        }
+        simTickRef.current++
+      }
+    }, 1000 / simRate)
+    return () => clearInterval(interval)
+  }, [simActive, simClicksOn, simRate, simMode, simSeparation, onSimClick])
+
+  // Auto-sim mouse movement (figure-8 pattern)
+  useEffect(() => {
+    if (!simActive || !simMouseOn) {
+      onSimMouseActiveChange(false)
+      return
+    }
+    onSimMouseActiveChange(true)
+    let running = true
+    const loop = () => {
+      if (!running) return
+      const t = Date.now() * 0.001 * simMouseSpeed
+      // Figure-8 lissajous: x=sin(t), y=sin(2t)
+      const x = 0.5 + Math.sin(t) * simMouseRadius
+      const y = 0.5 + Math.sin(t * 2) * simMouseRadius * 0.7
+      onSimMouseUpdate(x, y)
+      simMouseFrameRef.current = requestAnimationFrame(loop)
+    }
+    simMouseFrameRef.current = requestAnimationFrame(loop)
+    return () => { running = false; cancelAnimationFrame(simMouseFrameRef.current) }
+  }, [simActive, simMouseOn, simMouseSpeed, simMouseRadius, onSimMouseActiveChange, onSimMouseUpdate])
 
   const handleChange = (key: keyof ShaderTuning, value: number) => {
     onChange({ ...tuning, [key]: value })
@@ -186,16 +247,47 @@ export function DevPanel({ tuning, energy, onChange }: DevPanelProps) {
         </div>
       </div>
 
-      {/* Energy meter */}
-      <div className="mb-3 flex items-center gap-2">
-        <span className="text-[0.6rem] text-cold-white-dim/40 w-16">ENERGY</span>
-        <div className="flex-1 h-1.5 bg-cold-white-dim/10 rounded overflow-hidden">
-          <div
-            className="h-full bg-electric-purple transition-all duration-100"
-            style={{ width: `${Math.min(100, (energy / tuning.ripThreshold) * 100)}%` }}
-          />
+      {/* Energy meter + override lock */}
+      <div className="mb-3">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onEnergyOverride(energyOverride !== null ? null : energy)}
+            className={`text-[0.7rem] ${energyOverride !== null ? 'text-electric-purple' : 'text-cold-white-dim/40'} hover:text-electric-purple`}
+            title={energyOverride !== null ? 'Unlock energy' : 'Lock energy at current value'}
+          >
+            {energyOverride !== null ? '🔒' : '🔓'}
+          </button>
+          <span className="text-[0.6rem] text-cold-white-dim/40 w-12">ENERGY</span>
+          <div className="flex-1 h-1.5 bg-cold-white-dim/10 rounded overflow-hidden">
+            <div
+              className="h-full bg-electric-purple transition-all duration-100"
+              style={{ width: `${Math.min(100, ((energyOverride ?? energy) / tuning.ripThreshold) * 100)}%` }}
+            />
+          </div>
+          <span className="text-[0.6rem] w-8 text-right">{(energyOverride ?? energy).toFixed(0)}</span>
+          <button
+            onClick={() => onWallRipChange(!wallRip)}
+            className={`text-[0.6rem] ml-1 px-1.5 py-0.5 rounded border ${wallRip ? 'text-red-400 border-red-400/30 bg-red-400/10' : 'text-cold-white-dim/30 border-cold-white-dim/10'}`}
+            title={wallRip ? 'Rip zone blocked — click to allow' : 'Rip zone open — click to block'}
+          >
+            {wallRip ? '🚫' : '⚡'}
+          </button>
         </div>
-        <span className="text-[0.6rem] w-8 text-right">{energy.toFixed(0)}</span>
+        {energyOverride !== null && (
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-[0.55rem] text-electric-purple/60 w-16">Override</span>
+            <input
+              type="range"
+              min={0}
+              max={300}
+              step={1}
+              value={energyOverride}
+              onChange={e => onEnergyOverride(Number(e.target.value))}
+              className="flex-1 h-1 accent-electric-purple"
+            />
+            <span className="text-[0.55rem] text-electric-purple w-8 text-right">{energyOverride.toFixed(0)}</span>
+          </div>
+        )}
       </div>
 
       {/* Sliders */}
@@ -261,6 +353,88 @@ export function DevPanel({ tuning, energy, onChange }: DevPanelProps) {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Auto-sim controls */}
+      <div className="mt-3 border-t border-cold-white-dim/10 pt-2">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-[0.6rem] text-electric-purple/60 uppercase tracking-wider">Auto-Sim</span>
+          <button
+            onClick={() => setSimActive(!simActive)}
+            className={`text-[0.6rem] px-2 py-0.5 rounded border ${
+              simActive
+                ? 'text-electric-purple border-electric-purple/40 bg-electric-purple/10'
+                : 'text-cold-white-dim/40 border-cold-white-dim/10 hover:border-electric-purple/30'
+            }`}
+          >
+            {simActive ? '■ STOP' : '▶ START'}
+          </button>
+        </div>
+
+        {/* Independent toggles */}
+        <div className="flex items-center gap-3 mb-1.5">
+          <button
+            onClick={() => setSimClicksOn(!simClicksOn)}
+            className={`text-[0.55rem] ${simClicksOn ? 'text-electric-purple' : 'text-cold-white-dim/30'}`}
+          >
+            {simClicksOn ? '☑' : '☐'} Clicks
+          </button>
+          <button
+            onClick={() => setSimMouseOn(!simMouseOn)}
+            className={`text-[0.55rem] ${simMouseOn ? 'text-electric-purple' : 'text-cold-white-dim/30'}`}
+          >
+            {simMouseOn ? '☑' : '☐'} Mouse
+          </button>
+        </div>
+
+        <div className="space-y-1">
+          {/* Click controls */}
+          {simClicksOn && (
+            <>
+              <div className="flex items-center gap-2">
+                <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Mode</span>
+                <button
+                  onClick={() => setSimMode(simMode === 'single' ? 'dual' : 'single')}
+                  className="text-[0.55rem] text-cold-white-dim/50 hover:text-electric-purple border border-cold-white-dim/10 rounded px-2 py-0.5"
+                >
+                  {simMode === 'single' ? '● Single Origin' : '●● Dual Origins'}
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Rate</span>
+                <input type="range" min={0.5} max={10} step={0.5} value={simRate}
+                  onChange={e => setSimRate(Number(e.target.value))} className="flex-1 h-1 accent-electric-purple" />
+                <span className="text-[0.55rem] w-10 text-right">{simRate}/s</span>
+              </div>
+              {simMode === 'dual' && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Spread</span>
+                  <input type="range" min={0.05} max={0.5} step={0.05} value={simSeparation}
+                    onChange={e => setSimSeparation(Number(e.target.value))} className="flex-1 h-1 accent-electric-purple" />
+                  <span className="text-[0.55rem] w-10 text-right">{simSeparation.toFixed(2)}</span>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Mouse controls */}
+          {simMouseOn && (
+            <>
+              <div className="flex items-center gap-2">
+                <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Speed</span>
+                <input type="range" min={0.1} max={3} step={0.1} value={simMouseSpeed}
+                  onChange={e => setSimMouseSpeed(Number(e.target.value))} className="flex-1 h-1 accent-electric-purple" />
+                <span className="text-[0.55rem] w-10 text-right">{simMouseSpeed.toFixed(1)}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Radius</span>
+                <input type="range" min={0.05} max={0.4} step={0.05} value={simMouseRadius}
+                  onChange={e => setSimMouseRadius(Number(e.target.value))} className="flex-1 h-1 accent-electric-purple" />
+                <span className="text-[0.55rem] w-10 text-right">{simMouseRadius.toFixed(2)}</span>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

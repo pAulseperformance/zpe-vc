@@ -1,4 +1,5 @@
 import { useRef, useMemo, useCallback } from 'react'
+import type { MutableRefObject } from 'react'
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
@@ -23,9 +24,13 @@ interface ShaderPlaneProps {
   onRip: () => void
   tuning: ShaderTuning
   onEnergyChange: (energy: number) => void
+  energyOverride: number | null
+  simClickQueue: MutableRefObject<Array<{x: number, y: number}>>
+  simMouseActive: boolean
+  simMousePos: MutableRefObject<{x: number, y: number}>
 }
 
-function ShaderPlane({ onRip, tuning, onEnergyChange }: ShaderPlaneProps) {
+function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos }: ShaderPlaneProps) {
   const meshRef = useRef<THREE.Mesh>(null)
   const { size } = useThree()
 
@@ -33,6 +38,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange }: ShaderPlaneProps) {
   const prevMouseRef = useRef(new THREE.Vector2(0.5, 0.5))
   const energyRef = useRef(0)
   const hasRippedRef = useRef(false)
+  const heatFieldRef = useRef(0)
   const ripFlashRef = useRef(0)
   const catalystsRef = useRef<Catalyst[]>([])
   const tuningRef = useRef(tuning)
@@ -62,6 +68,8 @@ function ShaderPlane({ onRip, tuning, onEnergyChange }: ShaderPlaneProps) {
       uHeatDecay: { value: tuning.heatDecay },
       uHeatIntensity: { value: tuning.heatIntensity },
       uInterferenceBlend: { value: tuning.interferenceBlend },
+      uHeatField: { value: 0 },
+      uIridescence: { value: tuning.iridescence ?? 0.5 },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
@@ -107,15 +115,46 @@ function ShaderPlane({ onRip, tuning, onEnergyChange }: ShaderPlaneProps) {
     }
     catalystsRef.current = catalystsRef.current.filter(c => (now - c.time) < t.waveLifetime)
 
+    // Override mouse position with sim mouse when active
+    if (simMouseActive) {
+      mouseRef.current.set(simMousePos.current.x, simMousePos.current.y)
+    }
+
+    // Drain sim click queue (injected from DevPanel auto-sim)
+    const maxW = Math.floor(t.maxWaves)
+    const simClicks = simClickQueue.current.splice(0)
+    for (const click of simClicks) {
+      catalystsRef.current.push({ x: click.x, y: click.y, time: -1 })
+      energyRef.current += t.clickSpike
+      if (catalystsRef.current.length > maxW) catalystsRef.current.shift()
+    }
+
     const velocity = mouseRef.current.distanceTo(prevMouseRef.current)
     prevMouseRef.current.copy(mouseRef.current)
 
+    // Energy input from movement
     energyRef.current += velocity * t.velocityMult
+
+    // Momentum decay (linear — so rapid clicking CAN reach rip threshold)
     energyRef.current -= t.energyDecay * delta
     energyRef.current = Math.max(0, energyRef.current)
 
+    // Energy override: pin at fixed value when locked
+    const effectiveEnergy = energyOverride !== null ? energyOverride : energyRef.current
+
+    // Phase 2: Persistent heat field — accumulates from active catalysts, decays independently
+    const cats = catalystsRef.current
+    for (const cat of cats) {
+      const age = state.clock.elapsedTime - cat.time
+      if (age > 0 && age < t.waveLifetime) {
+        heatFieldRef.current += Math.max(0, 1 - age / t.waveLifetime) * delta * 2
+      }
+    }
+    heatFieldRef.current *= Math.pow(0.97, delta * 60) // Slow independent decay
+    heatFieldRef.current = Math.min(heatFieldRef.current, 3.0) // Cap to prevent runaway
+
     // Report energy to dev panel
-    onEnergyChange(energyRef.current)
+    onEnergyChange(effectiveEnergy)
 
     if (energyRef.current >= t.ripThreshold && !hasRippedRef.current) {
       hasRippedRef.current = true
@@ -129,7 +168,6 @@ function ShaderPlane({ onRip, tuning, onEnergyChange }: ShaderPlaneProps) {
     }
 
     // Catalyst uniforms
-    const cats = catalystsRef.current
     const catPositions = mat.uniforms.uCatalysts.value as THREE.Vector2[]
     const catTimes = mat.uniforms.uCatalystTimes.value as Float32Array
 
@@ -147,7 +185,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange }: ShaderPlaneProps) {
     // Core uniforms
     mat.uniforms.uTime.value = now
     mat.uniforms.uMouse.value.copy(mouseRef.current)
-    mat.uniforms.uEnergy.value = energyRef.current
+    mat.uniforms.uEnergy.value = effectiveEnergy
     mat.uniforms.uRipFlash.value = ripFlashRef.current
     mat.uniforms.uResolution.value.set(
       state.size.width * state.viewport.dpr,
@@ -168,6 +206,8 @@ function ShaderPlane({ onRip, tuning, onEnergyChange }: ShaderPlaneProps) {
     mat.uniforms.uHeatDecay.value = t.heatDecay
     mat.uniforms.uHeatIntensity.value = t.heatIntensity
     mat.uniforms.uInterferenceBlend.value = t.interferenceBlend
+    mat.uniforms.uHeatField.value = heatFieldRef.current
+    mat.uniforms.uIridescence.value = t.iridescence ?? 0.5
   })
 
   return (
@@ -196,9 +236,13 @@ interface QuantumCanvasProps {
   onRip: () => void
   tuning: ShaderTuning
   onEnergyChange: (energy: number) => void
+  energyOverride: number | null
+  simClickQueue: MutableRefObject<Array<{x: number, y: number}>>
+  simMouseActive: boolean
+  simMousePos: MutableRefObject<{x: number, y: number}>
 }
 
-export function QuantumCanvas({ onRip, tuning, onEnergyChange }: QuantumCanvasProps) {
+export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos }: QuantumCanvasProps) {
   return (
     <Canvas
       gl={{ antialias: false, alpha: false, powerPreference: 'high-performance' }}
@@ -206,7 +250,7 @@ export function QuantumCanvas({ onRip, tuning, onEnergyChange }: QuantumCanvasPr
       dpr={[1, 1.5]}
       style={{ background: '#000000', cursor: 'none' }}
     >
-      <ShaderPlane onRip={onRip} tuning={tuning} onEnergyChange={onEnergyChange} />
+      <ShaderPlane onRip={onRip} tuning={tuning} onEnergyChange={onEnergyChange} energyOverride={energyOverride} simClickQueue={simClickQueue} simMouseActive={simMouseActive} simMousePos={simMousePos} />
       <EffectComposer>
         <Bloom
           intensity={1.5}

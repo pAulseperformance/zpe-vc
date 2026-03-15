@@ -33,6 +33,8 @@ uniform float uParallaxDepth;
 uniform float uHeatDecay;
 uniform float uHeatIntensity;
 uniform float uInterferenceBlend;
+uniform float uHeatField;
+uniform float uIridescence;
 
 // ─── Palette ───
 const vec3 BLACK     = vec3(0.0);
@@ -56,6 +58,16 @@ vec3 energySpectrum(float intensity) {
   vec3 c = vec3(1.0, 1.0, 1.0);
   vec3 d = vec3(0.0, 0.15, 0.40); // Phase offsets create rainbow
   return a + b * cos(6.28318 * (c * i + d));
+}
+
+// Blackbody cooling spectrum: white-hot → teal → gold → amber → violet
+vec3 coolingSpectrum(float heat) {
+  float h = clamp(heat, 0.0, 1.0);
+  vec3 a = vec3(0.5, 0.4, 0.35);
+  vec3 b = vec3(0.5, 0.45, 0.4);
+  vec3 c = vec3(1.0, 0.8, 0.6);
+  vec3 d = vec3(0.0, 0.05, 0.20);
+  return a + b * cos(6.28318 * (c * h + d));
 }
 
 // ─── Simplex Noise ───
@@ -151,7 +163,7 @@ void main() {
     float emDamping = exp(-age * uEmDamping);
     float lenzDamping = exp(-age * uGravDamping);
 
-    // Wavefront ring
+    // Wavefront ring (sharp visual)
     float frontDist = abs(dist - waveFront);
     float atFront = smoothstep(uWaveWidth, 0.0, frontDist);
 
@@ -162,11 +174,18 @@ void main() {
                        + sin(dist * uWaveFreq * 1.7 + age * 15.0) * n2 * 0.4;
     float emIntensity = atFront * abs(emWaveSigned) * emDamping;
 
-    // ── Accumulate for interference ──
-    waveFieldSigned += emWaveSigned * atFront * emDamping;
-    waveFieldEnvelope += emIntensity;
+    // ── Extended field for interference ──
+    // Wave exists everywhere the wavefront has already swept past (dist < waveFront)
+    // Decays with distance behind the front and with age
+    float behindWavefront = smoothstep(waveFront + 0.01, waveFront - 0.01, dist);
+    float fieldDecay = exp(-max(waveFront - dist, 0.0) * 3.0); // decay behind front
+    float extendedField = behindWavefront * fieldDecay * emDamping;
 
-    // ── Additive color (old path, blended against interference) ──
+    // ── Accumulate for interference (uses EXTENDED field, not thin ring) ──
+    waveFieldSigned += emWaveSigned * extendedField;
+    waveFieldEnvelope += abs(emWaveSigned) * extendedField;
+
+    // ── Additive color (old path — uses sharp ring for visual wavefront) ──
     float specBase = emIntensity * 0.4 + eNorm * 0.25 + age * 0.1;
     float disp = 0.08;
     vec3 waveColor = vec3(
@@ -205,14 +224,22 @@ void main() {
   );
 
   // Constructive zones: bright. Destructive zones: dark voids.
-  // Contrast-boost the ratio so the effect is dramatic
   float interferenceFactor = (waveFieldEnvelope > 0.001)
-    ? pow(interference / waveFieldEnvelope, 0.6)  // < 1.0 = sharper contrast
+    ? pow(interference / waveFieldEnvelope, 0.3)  // Steep curve = dramatic dark bands
     : 0.0;
-  vec3 catalystColorInterference = interferenceColor * interferenceFactor * waveFieldEnvelope * 0.5;
+
+  // Constructive color: boosted where waves reinforce
+  vec3 catalystColorInterference = interferenceColor * interferenceFactor * waveFieldEnvelope * 0.6;
+
+  // Cancellation void: actively darken where destructive interference kills energy
+  float voidStrength = (waveFieldEnvelope > 0.01)
+    ? smoothstep(0.0, 0.5, cancellation / waveFieldEnvelope)
+    : 0.0;
 
   // Blend between additive (old) and interference (new)
   vec3 catalystColor = mix(catalystColorAdditive, catalystColorInterference, uInterferenceBlend);
+  // Apply destructive void — darkens EVERYTHING in cancellation zones
+  catalystColor *= mix(1.0, 1.0 - voidStrength * 0.8, uInterferenceBlend);
 
   // Clamp heat residual
   heatResidual = clamp(heatResidual, 0.0, 1.0);
@@ -222,8 +249,8 @@ void main() {
   // ── Quantum dust (depth parallax + heat trail + energy colors) ──
   vec3 color = BLACK;
 
-  // Local energy intensity for color mapping (includes heat residual)
-  float localHeat = eNorm * hoverInfluence + heatResidual * uHeatIntensity;
+  // Local energy intensity for color mapping (includes heat residual + persistent heat)
+  float localHeat = eNorm * hoverInfluence + heatResidual * uHeatIntensity + uHeatField * 0.3;
 
   // Per-layer depth parallax: shifts UV based on cursor offset × depth
   vec2 cursorOffset = uv - mouse;
@@ -234,6 +261,10 @@ void main() {
   float dust1 = snoise(uv1 * 350.0 + t * speed1 * 0.5);
   float sparks1 = smoothstep(0.78, 0.85, dust1) * 0.07 * brightMult;
   vec3 dust1Color = mix(COLD_WHT, energySpectrum(localHeat * 0.8), localHeat);
+  // Heat trail color: use cooling spectrum for warm-to-cold transition
+  float heatTint = heatResidual * uHeatIntensity + uHeatField * 0.2;
+  vec3 heatColor = coolingSpectrum(heatTint);
+  dust1Color = mix(dust1Color, heatColor, clamp(heatTint * 0.5, 0.0, 0.6));
   color += dust1Color * sparks1;
 
   // Layer 2: violet dust — MID (depth 0.5)
@@ -338,6 +369,15 @@ void main() {
          + mix(VIOLET, HOT_WHITE, 0.5) * max(whisper, 0.0)) * auraGate;
 
   color += catalystColor;
+
+  // ── Thin-film iridescence (soap-bubble / oil-slick physics) ──
+  float filmThickness = 0.5 + 0.5 * sin(
+    mouseDist * 25.0 + waveFieldEnvelope * 8.0 + t * 0.3
+  );
+  vec3 iridColor = energySpectrum(filmThickness);
+  float iriStrength = smoothstep(0.0, 0.2, eNorm + uHeatField * 0.3)
+                    * (1.0 - smoothstep(0.0, uHoverRadius * 3.0, mouseDist));
+  color = mix(color, color * iridColor * 1.6, iriStrength * uIridescence);
 
   float vDist = length(vUv - 0.5) * 1.6;
   float vignette = 1.0 - pow(vDist, 1.5);

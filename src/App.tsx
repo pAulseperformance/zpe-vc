@@ -11,8 +11,23 @@ export default function App() {
   const [tuning, setTuning] = usePersistedTuning()
   const energyRef = useRef(0)
   const [energyDisplay, setEnergyDisplay] = useState(0)
+  const [energyOverride, setEnergyOverride] = useState<number | null>(null)
+  const simClickQueueRef = useRef<Array<{x: number, y: number}>>([])
+  const [wallRip, setWallRip] = useState(true)
+  const [simMouseActive, setSimMouseActive] = useState(false)
+  const simMousePosRef = useRef({ x: 0.5, y: 0.5 })
 
-  const onRip = useCallback(() => setIsForging(true), [])
+  const onRip = useCallback(() => {
+    if (!wallRip) setIsForging(true)
+  }, [wallRip])
+
+  const handleSimClick = useCallback((x: number, y: number) => {
+    simClickQueueRef.current.push({ x, y })
+  }, [])
+
+  const handleSimMouseUpdate = useCallback((x: number, y: number) => {
+    simMousePosRef.current = { x, y }
+  }, [])
 
   // Throttle energy display updates to ~10fps to avoid re-render spam
   const lastUpdateRef = useRef(0)
@@ -37,6 +52,10 @@ export default function App() {
           onRip={onRip}
           tuning={tuning}
           onEnergyChange={handleEnergyChange}
+          energyOverride={energyOverride}
+          simClickQueue={simClickQueueRef}
+          simMouseActive={simMouseActive}
+          simMousePos={simMousePosRef}
         />
       </motion.div>
 
@@ -50,6 +69,14 @@ export default function App() {
           tuning={tuning}
           energy={energyDisplay}
           onChange={setTuning}
+          energyOverride={energyOverride}
+          onEnergyOverride={setEnergyOverride}
+          onSimClick={handleSimClick}
+          wallRip={wallRip}
+          onWallRipChange={setWallRip}
+          simMouseActive={simMouseActive}
+          onSimMouseActiveChange={setSimMouseActive}
+          onSimMouseUpdate={handleSimMouseUpdate}
         />
       )}
     </div>
