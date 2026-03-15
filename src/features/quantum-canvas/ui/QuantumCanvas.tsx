@@ -71,6 +71,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
       uHeatField: { value: 0 },
       uIridescence: { value: tuning.iridescence ?? 0.5 },
       uPaletteMode: { value: tuning.paletteMode ?? 1 },
+      uMouseVelocity: { value: new THREE.Vector2(0, 0) },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
@@ -131,6 +132,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
     }
 
     const velocity = mouseRef.current.distanceTo(prevMouseRef.current)
+    const velocityVec = mouseRef.current.clone().sub(prevMouseRef.current)
     prevMouseRef.current.copy(mouseRef.current)
 
     // Energy input from movement
@@ -210,6 +212,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
     mat.uniforms.uHeatField.value = heatFieldRef.current
     mat.uniforms.uIridescence.value = t.iridescence ?? 0.5
     mat.uniforms.uPaletteMode.value = t.paletteMode ?? 1
+    mat.uniforms.uMouseVelocity.value.copy(velocityVec)
   })
 
   return (

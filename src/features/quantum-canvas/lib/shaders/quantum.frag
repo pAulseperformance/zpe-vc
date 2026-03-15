@@ -11,6 +11,7 @@ varying vec2 vUv;
 uniform float uTime;
 uniform vec2  uResolution;
 uniform vec2  uMouse;
+uniform vec2  uMouseVelocity;
 uniform float uEnergy;
 uniform float uRipFlash;
 
@@ -224,7 +225,10 @@ void main() {
     // ── Additive color (uses sharp ring for visual wavefront) ──
     // Gravitational redshift: waves near collapse zones shift toward red
     float redshift = lenzMask * collapsePhase * 0.3;
-    float specBase = emIntensity * 0.4 + eNorm * 0.25 + age * 0.1 - redshift;
+    // Doppler shift: approaching waves blueshift, receding waves redshift
+    vec2 waveDir = (rawDist > 0.001) ? normalize(delta) : vec2(0.0);
+    float dopplerShift = dot(waveDir, uMouseVelocity) * 2.0; // positive = approaching = blue
+    float specBase = emIntensity * 0.4 + eNorm * 0.25 + age * 0.1 - redshift + dopplerShift;
     float disp = 0.08;
     vec3 waveColor = vec3(
       energySpectrum(specBase - disp).r,
@@ -467,6 +471,25 @@ void main() {
   float iriStrength = smoothstep(0.0, 0.2, eNorm + uHeatField * 0.3)
                     * (1.0 - smoothstep(0.0, uHoverRadius * 3.0, mouseDist));
   color = mix(color, color * iridColor * 1.6, iriStrength * uIridescence);
+
+  // ── Background star field with gravitational lensing ──
+  // Stars are lensed by gravity sources → Einstein ring effect near catalysts
+  vec2 starUV = vUv + lenzDisplacement * 3.0; // amplify lensing for visible distortion
+  float starGrid = 150.0; // star density
+  vec2 starCell = floor(starUV * starGrid);
+  vec2 starFrac = fract(starUV * starGrid);
+  // Pseudo-random hash per cell (deterministic star positions)
+  float starHash = fract(sin(dot(starCell, vec2(127.1, 311.7))) * 43758.5453);
+  float starHash2 = fract(sin(dot(starCell, vec2(269.5, 183.3))) * 76195.6397);
+  // Star position within cell
+  vec2 starPos = vec2(fract(starHash * 13.37), fract(starHash2 * 7.41));
+  float starDist = length(starFrac - starPos);
+  // Star brightness: sharp point with subtle twinkle
+  float twinkle = sin(t * (1.0 + starHash * 3.0) + starHash * 6.28) * 0.3 + 0.7;
+  float starBright = smoothstep(0.03, 0.005, starDist) * step(0.85, starHash) * twinkle;
+  // Star color temperature: warm white to blue-white
+  vec3 starColor = mix(vec3(1.0, 0.95, 0.85), vec3(0.85, 0.92, 1.0), starHash2);
+  color += starColor * starBright * 0.15;
 
   float vDist = length(vUv - 0.5) * 1.6;
   float vignette = 1.0 - pow(vDist, 1.5);
