@@ -50,7 +50,16 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
       <PanelHeader
         audioEnabled={audioEnabled}
         onAudioToggle={onAudioToggle}
-        onLog={() => console.log(JSON.stringify(tuning, null, 2))}
+        onCopy={(btn) => {
+          const og = btn.innerText
+          navigator.clipboard.writeText(JSON.stringify(tuning, null, 2))
+          btn.innerText = 'COPIED'
+          btn.classList.add('text-electric-purple')
+          setTimeout(() => {
+            btn.innerText = og
+            btn.classList.remove('text-electric-purple')
+          }, 1000)
+        }}
         onReset={() => onChange({ ...DEFAULT_TUNING })}
         onCollapse={() => setCollapsed(true)}
       />
@@ -85,7 +94,33 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
         ))}
       </div>
 
-      <PresetControls tuning={tuning} onChange={onChange} />
+      <PresetControls
+        tuning={{
+          ...tuning,
+          ...(sim.simActive ? {
+            autoSim: {
+              active: sim.simActive,
+              mode: sim.simMode,
+              rate: sim.simRate
+            }
+          } : {}),
+          ripBlocked: wallRip
+        }}
+        onChange={(loadedTuning) => {
+          onChange(loadedTuning)
+          if (loadedTuning.autoSim) {
+            sim.setSimActive(loadedTuning.autoSim.active)
+            sim.setSimMode(loadedTuning.autoSim.mode)
+            sim.setSimRate(loadedTuning.autoSim.rate)
+            sim.setSimClicksOn(true)
+          } else {
+            sim.setSimActive(false)
+          }
+          if (loadedTuning.ripBlocked !== undefined) {
+            onWallRipChange(loadedTuning.ripBlocked)
+          }
+        }}
+      />
       <BarrierControls tuning={tuning} onChange={onChange} />
       <AutoSimControls sim={sim} />
     </div>
@@ -94,9 +129,9 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
 
 /* ─── Inline sub-components (tightly coupled to DevPanel layout) ─── */
 
-function PanelHeader({ audioEnabled, onAudioToggle, onLog, onReset, onCollapse }: {
+function PanelHeader({ audioEnabled, onAudioToggle, onCopy, onReset, onCollapse }: {
   audioEnabled: boolean; onAudioToggle: (v: boolean) => void
-  onLog: () => void; onReset: () => void; onCollapse: () => void
+  onCopy: (btn: HTMLButtonElement) => void; onReset: () => void; onCollapse: () => void
 }) {
   return (
     <div className="flex justify-between items-center mb-3">
@@ -109,9 +144,15 @@ function PanelHeader({ audioEnabled, onAudioToggle, onLog, onReset, onCollapse }
         >
           {audioEnabled ? '🔊' : '🔇'}
         </button>
-        <button onClick={onLog} className="text-cold-white-dim/40 hover:text-cold-white text-[0.6rem] uppercase">Log</button>
-        <button onClick={onReset} className="text-cold-white-dim/40 hover:text-cold-white text-[0.6rem] uppercase">Reset</button>
-        <button onClick={onCollapse} className="text-cold-white-dim/40 hover:text-cold-white">×</button>
+        <button
+          onClick={(e) => onCopy(e.currentTarget)}
+          className="text-cold-white-dim/40 hover:text-cold-white text-[0.6rem] uppercase transition-colors"
+          title="Copy settings to clipboard"
+        >
+          Copy JSON
+        </button>
+        <button onClick={onReset} className="text-cold-white-dim/40 hover:text-cold-white text-[0.6rem] uppercase transition-colors" title="Reset sliders to defaults (does not delete presets)">Reset</button>
+        <button onClick={onCollapse} className="text-cold-white-dim/40 hover:text-cold-white tracking-widest text-[0.55rem] uppercase border border-cold-white-dim/20 px-1.5 rounded" title="Hide panel">Hide</button>
       </div>
     </div>
   )
@@ -141,10 +182,10 @@ function EnergyMeter({ energy, energyOverride, onEnergyOverride, ripThreshold, w
         <span className="text-[0.6rem] w-8 text-right">{(energyOverride ?? energy).toFixed(0)}</span>
         <button
           onClick={() => onWallRipChange(!wallRip)}
-          className={`text-[0.6rem] ml-1 px-1.5 py-0.5 rounded border ${wallRip ? 'text-red-400 border-red-400/30 bg-red-400/10' : 'text-cold-white-dim/30 border-cold-white-dim/10'}`}
+          className={`text-[0.6rem] ml-1 px-1.5 py-0.5 rounded border transition-colors ${wallRip ? 'text-red-400 border-red-400/50 bg-red-400/10 hover:bg-red-400/20' : 'text-yellow-400/80 border-yellow-400/30 hover:bg-yellow-400/10'}`}
           title={wallRip ? 'Rip zone blocked — click to allow' : 'Rip zone open — click to block'}
         >
-          {wallRip ? '🚫' : '⚡'}
+          {wallRip ? '🚫 BLOCKED' : '⚡ RIP ON'}
         </button>
       </div>
       {energyOverride !== null && (

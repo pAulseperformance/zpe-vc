@@ -24,26 +24,57 @@ export function useAutoSim(callbacks: AutoSimCallbacks) {
   const [simMouseRadius, setSimMouseRadius] = useState(0.15)
   const simMouseFrameRef = useRef(0)
 
-  const { onSimClick, onSimMouseActiveChange, onSimMouseUpdate } = callbacks
+  const callbacksRef = useRef(callbacks)
+  callbacksRef.current = callbacks
 
-  // Auto-sim click interval
+  // Refs to avoid tearing down the loop when slider changes
+  const simStateRef = useRef({ simMode, simSeparation, simRate })
+  simStateRef.current = { simMode, simSeparation, simRate }
+  
+  // Auto-sim click loop (RAF-based for smooth rate changes)
   useEffect(() => {
     if (!simActive || !simClicksOn) return
-    const interval = setInterval(() => {
+    
+    let lastTime = 0
+    let elapsed = 0
+    let frameId: number
+
+    const triggerClicks = () => {
+      const { simMode, simSeparation } = simStateRef.current
+      const { onSimClick } = callbacksRef.current
       if (simMode === 'single') {
         onSimClick(0.5, 0.5)
       } else {
-        // Fire BOTH origins simultaneously for coherent interference
         const half = simSeparation / 2
         onSimClick(0.5 - half, 0.5)
         onSimClick(0.5 + half, 0.5)
       }
-    }, 1000 / simRate)
-    return () => clearInterval(interval)
-  }, [simActive, simClicksOn, simRate, simMode, simSeparation, onSimClick])
+    }
+
+    const loop = (time: number) => {
+      if (lastTime === 0) lastTime = time // Initialize on first frame to prevent timestamp drift
+      
+      const delta = time - lastTime
+      lastTime = time
+      elapsed += delta
+      
+      const rate = simStateRef.current.simRate
+      const threshold = 1000 / rate
+      
+      if (elapsed >= threshold) {
+        elapsed = elapsed % threshold
+        triggerClicks()
+      }
+      frameId = requestAnimationFrame(loop)
+    }
+    
+    frameId = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(frameId)
+  }, [simActive, simClicksOn]) // Removed onSimClick to prevent teardowns
 
   // Auto-sim mouse movement (figure-8 lissajous pattern)
   useEffect(() => {
+    const { onSimMouseActiveChange } = callbacksRef.current
     if (!simActive || !simMouseOn) {
       onSimMouseActiveChange(false)
       return
@@ -55,12 +86,13 @@ export function useAutoSim(callbacks: AutoSimCallbacks) {
       const t = Date.now() * 0.001 * simMouseSpeed
       const x = 0.5 + Math.sin(t) * simMouseRadius
       const y = 0.5 + Math.sin(t * 2) * simMouseRadius * 0.7
+      const { onSimMouseUpdate } = callbacksRef.current
       onSimMouseUpdate(x, y)
       simMouseFrameRef.current = requestAnimationFrame(loop)
     }
     simMouseFrameRef.current = requestAnimationFrame(loop)
     return () => { running = false; cancelAnimationFrame(simMouseFrameRef.current) }
-  }, [simActive, simMouseOn, simMouseSpeed, simMouseRadius, onSimMouseActiveChange, onSimMouseUpdate])
+  }, [simActive, simMouseOn, simMouseSpeed, simMouseRadius])
 
   return {
     simActive, setSimActive,

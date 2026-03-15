@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { ShaderTuning } from '../lib/shader-tuning'
+import { BUILT_IN_PRESETS } from '../lib/shader-tuning'
 import { useShaderPresets } from '../lib/use-shader-presets'
 
 interface PresetControlsProps {
@@ -47,19 +48,22 @@ export function PresetControls({ tuning, onChange }: PresetControlsProps) {
       {names.length > 0 && (
         <div className="mt-2 space-y-1 max-h-24 overflow-y-auto">
           {names.map(name => (
-            <div key={name} className="flex items-center justify-between group">
+            <div key={name} className="flex items-center justify-between group py-1 border-b border-cold-white-dim/5 last:border-0 pl-1">
               <button
                 onClick={() => handleLoad(name)}
                 className="text-[0.55rem] text-cold-white-dim/50 hover:text-cold-white truncate flex-1 text-left"
               >
                 ▸ {name}
               </button>
-              <button
-                onClick={() => remove(name)}
-                className="text-[0.55rem] text-cold-white-dim/20 hover:text-red-400 opacity-0 group-hover:opacity-100 ml-2"
-              >
-                ×
-              </button>
+              {BUILT_IN_PRESETS[name] === undefined && (
+                <button
+                  onClick={() => remove(name)}
+                  className="text-[0.6rem] text-cold-white-dim/30 hover:text-red-400 px-2 py-0.5 rounded hover:bg-red-400/10 transition-colors ml-2"
+                  title="Delete preset"
+                >
+                  ×
+                </button>
+              )}
             </div>
           ))}
         </div>

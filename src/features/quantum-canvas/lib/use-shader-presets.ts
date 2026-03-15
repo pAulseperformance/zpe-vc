@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { ShaderTuning } from './shader-tuning'
-import { DEFAULT_TUNING } from './shader-tuning'
+import { BUILT_IN_PRESETS, DEFAULT_TUNING } from './shader-tuning'
 
 const STORAGE_KEY = 'zpe-shader-presets-v2'
 const ACTIVE_KEY = 'zpe-shader-active-v2'
@@ -8,16 +8,33 @@ const ACTIVE_KEY = 'zpe-shader-active-v2'
 export type PresetMap = Record<string, ShaderTuning>
 
 function loadPresets(): PresetMap {
+  const presets: PresetMap = {}
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as PresetMap) : {}
-  } catch {
-    return {}
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      for (const [k, v] of Object.entries(parsed)) {
+        if (!BUILT_IN_PRESETS[k]) {
+          presets[k] = v as ShaderTuning
+        }
+      }
+    }
+  } catch {}
+  
+  // Always enforce built-in presets over user overrides
+  for (const [k, v] of Object.entries(BUILT_IN_PRESETS)) {
+    presets[k] = { ...v }
   }
+  return presets
 }
 
 function savePresets(presets: PresetMap) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(presets))
+  // Only save user presets to localStorage, strip built-ins
+  const userPresets = { ...presets }
+  for (const k of Object.keys(BUILT_IN_PRESETS)) {
+    delete userPresets[k]
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(userPresets))
 }
 
 function loadActive(): ShaderTuning | null {

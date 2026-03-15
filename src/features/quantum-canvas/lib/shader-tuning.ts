@@ -29,6 +29,13 @@ export interface ShaderTuning {
   slitWidth: number       // Aperture width (UV units)
   slitSeparation: number  // Center-to-center slit distance
   diffSamples: number     // Huygens sample count
+  // Preset Metadata (not sent to shader)
+  autoSim?: {
+    active: boolean
+    mode: 'single' | 'dual'
+    rate: number
+  }
+  ripBlocked?: boolean
 }
 
 export const DEFAULT_TUNING: ShaderTuning = {
@@ -49,7 +56,7 @@ export const DEFAULT_TUNING: ShaderTuning = {
   parallaxDepth: 0,
   heatDecay: 0.2,
   heatAttack: 0.65,
-  heatIntensity: 1,
+  heatIntensity: 0.3,
   interferenceBlend: 0,
   iridescence: 0.6,
   paletteMode: 0,   // Default: physical
@@ -63,8 +70,76 @@ export const DEFAULT_TUNING: ShaderTuning = {
   diffSamples: 12,
 }
 
+export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
+  'Default': {
+    ...DEFAULT_TUNING
+  },
+  'Stable Nova': {
+    ...DEFAULT_TUNING,
+    paletteMode: 1,
+    wavelength: 2,
+    waveSpeed: 0.35,
+    waveFreq: 150,
+    waveWidth: 0.1,
+    emDamping: 3.1,
+    gravDamping: 0.05,
+    waveLifetime: 1.5,
+    maxWaves: 100,
+    lenzStrength: 0.5,
+    lenzWake: 0.6,
+    hoverRadius: 0.05,
+    energyDecay: 30,
+    velocityMult: 5,
+    clickSpike: 5,
+    ripThreshold: 30,
+    parallaxDepth: 0.15,
+    heatDecay: 2.0,
+    heatAttack: 0.0,
+    heatIntensity: 0.65,
+    interferenceBlend: 0.15,
+    iridescence: 1.0,
+    autoSim: {
+      active: true,
+      mode: 'single',
+      rate: 5.5,
+    },
+    ripBlocked: true,
+  },
+  'Purple Nebula': {
+    ...DEFAULT_TUNING,
+    paletteMode: 0, // Physical
+    wavelength: 2,  // Visible
+    waveSpeed: 2.00,
+    waveFreq: 25,
+    waveWidth: 0.100,
+    emDamping: 10.00,
+    gravDamping: 2.90,
+    waveLifetime: 15.00,
+    maxWaves: 15,
+    lenzStrength: 0.500,
+    lenzWake: 0.60,
+    hoverRadius: 0.05,
+    energyDecay: 2,
+    velocityMult: 30,
+    clickSpike: 20,
+    ripThreshold: 200,
+    parallaxDepth: 0.150,
+    heatDecay: 0.70,
+    heatAttack: 1.00,
+    heatIntensity: 1.00,
+    interferenceBlend: 0.02,
+    iridescence: 1.00,
+    autoSim: {
+      active: true,
+      mode: 'single',
+      rate: 10,
+    },
+    ripBlocked: true,
+  }
+}
+
 export interface SliderDef {
-  key: keyof ShaderTuning
+  key: keyof Omit<ShaderTuning, 'autoSim' | 'ripBlocked'>
   label: string
   min: number
   max: number

@@ -326,12 +326,15 @@ void main() {
     float frontDist = abs(dist - waveFront);
     float atFront = smoothstep(uWaveWidth, 0.0, frontDist);
 
-    // EM oscillation: multi-octave
-    float n1 = snoise(warpedUV * 40.0 + t * 5.0) * 0.5 + 0.5;
-    float n2 = snoise(warpedUV * 80.0 - t * 3.0 + 30.0) * 0.3 + 0.5;
-    float emWaveSigned = sin(dist * uWaveFreq - age * 30.0) * n1
-                       + sin(dist * uWaveFreq * 1.7 + age * 15.0) * n2 * 0.4;
-    float emIntensity = atFront * abs(emWaveSigned) * emDamping;
+    // EM oscillation: multi-octave -> skip snoise if outside wavefront ring
+    float emIntensity = 0.0;
+    if (atFront > 0.001) {
+      float n1 = snoise(warpedUV * 40.0 + t * 5.0) * 0.5 + 0.5;
+      float n2 = snoise(warpedUV * 80.0 - t * 3.0 + 30.0) * 0.3 + 0.5;
+      float emWaveSigned = sin(dist * uWaveFreq - age * 30.0) * n1
+                         + sin(dist * uWaveFreq * 1.7 + age * 15.0) * n2 * 0.4;
+      emIntensity = atFront * abs(emWaveSigned) * emDamping;
+    }
 
     // ── Extended field for interference ──
     // Wave exists everywhere the wavefront has already swept past (dist < waveFront)
@@ -341,37 +344,34 @@ void main() {
     float extendedField = behindWavefront * fieldDecay * emDamping;
 
     // ── Clean sine for interference — no noise, no harmonics ──
-    // Single source: abs(sin(d*f)) / abs(sin(d*f)) = 1.0 everywhere → no self-interference
-    // Two sources: sin(d1*f) + sin(d2*f) cancels where d1-d2 = λ/2 → visible dark bands
-    float cleanWave = sin(dist * uWaveFreq - age * 30.0);
+    float cleanWave = 0.0;
+    if (extendedField > 0.001) {
+      cleanWave = sin(dist * uWaveFreq - age * 30.0);
 
-    // ── Barrier diffraction ──
-    // If barrier is enabled: check if wave path crosses the barrier
-    if (uBarrierEnabled > 0.5) {
-      bool catAbove = cat.y > uBarrierY;
-      bool pixAbove = warpedUV.y > uBarrierY;
-      bool crosses = (catAbove != pixAbove); // path crosses barrier
+      // ── Barrier diffraction ──
+      if (uBarrierEnabled > 0.5) {
+        bool catAbove = cat.y > uBarrierY;
+        bool pixAbove = warpedUV.y > uBarrierY;
+        bool crosses = (catAbove != pixAbove); // path crosses barrier
 
-      if (crosses) {
-        if (uSlitCount < 0.5) {
-          // Solid wall — full shadow (no wave passes)
-          cleanWave = 0.0;
-          extendedField *= 0.02; // tiny tunneling leak
-        } else {
-          // Huygens-Fresnel diffraction through slits
-          float emDamp = exp(-age * uEmDamping);
-          vec2 huygens = huygensDiffraction(
-            warpedUV, cat, uWaveFreq, age, uWaveSpeed
-          );
-          cleanWave = huygens.x;
-          // Modulate extended field by diffracted amplitude
-          extendedField *= max(huygens.y, 0.01) * emDamp;
+        if (crosses) {
+          if (uSlitCount < 0.5) {
+            // Solid wall
+            cleanWave = 0.0;
+            extendedField *= 0.02; // tiny tunneling leak
+          } else {
+            // Huygens-Fresnel diffraction through slits
+            float emDamp = exp(-age * uEmDamping);
+            vec2 huygens = huygensDiffraction(warpedUV, cat, uWaveFreq, age, uWaveSpeed);
+            cleanWave = huygens.x;
+            extendedField *= max(huygens.y, 0.01) * emDamp;
+          }
         }
       }
-    }
 
-    waveFieldSigned += cleanWave * extendedField;
-    waveFieldEnvelope += abs(cleanWave) * extendedField;
+      waveFieldSigned += cleanWave * extendedField;
+      waveFieldEnvelope += abs(cleanWave) * extendedField;
+    }
 
     // ── Lenz collapse (computed first for redshift dependency) ──
     float collapsePhase = clamp(age * uGravDamping * 0.5, 0.0, 1.0);
@@ -386,15 +386,18 @@ void main() {
     // Doppler shift: approaching waves blueshift, receding waves redshift
     vec2 waveDir = (rawDist > 0.001) ? normalize(delta) : vec2(0.0);
     float dopplerShift = dot(waveDir, uMouseVelocity) * 2.0; // positive = approaching = blue
-    float specBase = emIntensity * 0.4 + eNorm * 0.25 + age * 0.1 - redshift + dopplerShift;
-    float disp = 0.08;
-    vec3 waveColor = vec3(
-      energySpectrum(specBase - disp).r,
-      energySpectrum(specBase).g,
-      energySpectrum(specBase + disp).b
-    );
-    catalystColorAdditive += waveColor * emIntensity * 0.5;
-    spectrumAccum += specBase * emIntensity;
+    
+    if (emIntensity > 0.001) {
+      float specBase = emIntensity * 0.4 + eNorm * 0.25 + age * 0.1 - redshift + dopplerShift;
+      float disp = 0.08;
+      vec3 waveColor = vec3(
+        energySpectrum(specBase - disp).r,
+        energySpectrum(specBase).g,
+        energySpectrum(specBase + disp).b
+      );
+      catalystColorAdditive += waveColor * emIntensity * 0.5;
+      spectrumAccum += specBase * emIntensity;
+    }
     // ── Heat trail: ADSR envelope (Attack/Decay) behind EM wavefront ──
     // Attack: how far behind the EM front the heat appears + onset ramp
     //   Low attack (0): heat follows EM almost instantly (tight wake)
@@ -421,21 +424,23 @@ void main() {
 
     float heatContrib = thermalPassed * thermalProfile * cooling;
 
-    // Barrier blocks heat
-    float heatBarrierFactor = 1.0;
-    if (uBarrierEnabled > 0.5) {
-      bool hCatAbove = cat.y > uBarrierY;
-      bool hPixAbove = warpedUV.y > uBarrierY;
-      if (hCatAbove != hPixAbove) {
-        if (uSlitCount < 0.5) {
-          heatBarrierFactor = 0.02;
-        } else {
-          vec2 hHuygens = huygensDiffraction(warpedUV, cat, uWaveFreq, age, uWaveSpeed);
-          heatBarrierFactor = clamp(hHuygens.y, 0.02, 1.0);
+    // Barrier blocks heat - only calculate if heat is significant
+    if (heatContrib > 0.001) {
+      float heatBarrierFactor = 1.0;
+      if (uBarrierEnabled > 0.5) {
+        bool hCatAbove = cat.y > uBarrierY;
+        bool hPixAbove = warpedUV.y > uBarrierY;
+        if (hCatAbove != hPixAbove) {
+          if (uSlitCount < 0.5) {
+            heatBarrierFactor = 0.02;
+          } else {
+            vec2 hHuygens = huygensDiffraction(warpedUV, cat, uWaveFreq, age, uWaveSpeed);
+            heatBarrierFactor = clamp(hHuygens.y, 0.02, 1.0);
+          }
         }
       }
+      heatResidual = max(heatResidual, heatContrib * heatBarrierFactor);
     }
-    heatResidual = max(heatResidual, heatContrib * heatBarrierFactor);
 
     // ── Lenz displacement ──
     vec2 dirToCenter = (rawDist > 0.001) ? normalize(cat - warpedUV) : vec2(0.0);
@@ -444,10 +449,11 @@ void main() {
     lenzDisplacement += dirToCenter * lenzMag;
 
     // ── Gravitational wave interference field ──
-    // Lower frequency than EM (gravitational waves have much longer wavelength)
-    float gravWave = sin(dist * uWaveFreq * 0.3 - age * 10.0);
-    gravFieldSigned += gravWave * lenzMag;
-    gravFieldEnvelope += abs(gravWave) * lenzMag;
+    if (lenzMag > 0.001) {
+      float gravWave = sin(dist * uWaveFreq * 0.3 - age * 10.0);
+      gravFieldSigned += gravWave * lenzMag;
+      gravFieldEnvelope += abs(gravWave) * lenzMag;
+    }
   }
 
   // ── Gravitational wave interference ──
