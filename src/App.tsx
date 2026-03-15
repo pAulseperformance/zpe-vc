@@ -4,8 +4,8 @@ const QuantumCanvas = lazy(() => import('@/features/quantum-canvas/ui/QuantumCan
 import { DevPanel, usePersistedTuning } from '@/features/quantum-canvas/ui/DevPanel'
 import { TerminalIntake } from '@/widgets/terminal-intake'
 import { DevModeButton } from '@/widgets/dev-mode-button/DevModeButton'
-import { useQuantumAudio } from '@/features/quantum-canvas/lib/use-quantum-audio'
-import type { SynthWaveform } from '@/features/quantum-canvas/lib/use-quantum-audio'
+import { useSynth } from '@/features/quantum-audio'
+import type { SynthWaveform } from '@/features/quantum-audio'
 
 const IS_DEV = import.meta.env.DEV
 
@@ -21,7 +21,7 @@ export default function App() {
   const simMousePosRef = useRef({ x: 0.5, y: 0.5 })
   const [audioEnabled, setAudioEnabled] = useState(false)
   const [hideCursor, setHideCursor] = useState(true)
-  const audio = useQuantumAudio()
+  const audio = useSynth()
   const gravBodyPositionsRef = useRef<{click: {x: number, y: number}, mouse: {x: number, y: number}} | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
