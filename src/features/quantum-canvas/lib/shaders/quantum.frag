@@ -113,12 +113,9 @@ void main() {
   vec2 warpedUV = uv + hoverWarpOffset * localWarp;
 
   // ══════════════════════════════════════════
-  // CATALYST EM WAVES — Interference + Heat Trail
+  // CATALYST EM WAVES — Lenz's Law
   // ══════════════════════════════════════════
-  float waveFieldR = 0.0;  // Signed wave accumulator per channel
-  float waveFieldG = 0.0;  // For constructive/destructive interference
-  float waveFieldB = 0.0;
-  float heatTrail = 0.0;   // Energy residue behind wavefronts
+  vec3 catalystColor = BLACK;
   vec2 lenzDisplacement = vec2(0.0);
 
   for (int i = 0; i < 10; i++) {
@@ -131,111 +128,91 @@ void main() {
     cat.x *= aspect;
     cat.x -= (aspect - 1.0) * 0.5;
 
-    // ── Fractal-warped distance ──
+    // ── Fractal-warped distance (organic, not circular) ──
     vec2 delta = warpedUV - cat;
     float rawDist = length(delta);
     float warpAngle = atan(delta.y, delta.x);
+    // 3 octaves of angular noise distort the ring shape
     float distWarp = snoise(vec2(warpAngle * 3.0, rawDist * 8.0 + age * 2.0)) * 0.04
                    + snoise(vec2(warpAngle * 7.0 + 20.0, rawDist * 15.0 - age * 1.5)) * 0.02
                    + snoise(vec2(warpAngle * 13.0 + 50.0, rawDist * 25.0 + age * 3.0)) * 0.01;
     float dist = rawDist + distWarp;
 
     float waveFront = age * uWaveSpeed;
+
+    // Two decay curves: fast for EM visuals, slow for Lenz collapse
     float emDamping = exp(-age * uWaveDamping);
     float lenzDamping = exp(-age * uWaveDamping * 0.35);
 
-    // Wavefront ring
+    // Wavefront ring (now organic due to warped dist)
     float frontDist = abs(dist - waveFront);
     float atFront = smoothstep(uWaveWidth, 0.0, frontDist);
 
-    // EM oscillation: SIGNED wave (not abs) for interference
+    // EM oscillation: multi-octave for chaotic texture
     float n1 = snoise(warpedUV * 40.0 + t * 5.0) * 0.5 + 0.5;
     float n2 = snoise(warpedUV * 80.0 - t * 3.0 + 30.0) * 0.3 + 0.5;
     float emWave = sin(dist * uWaveFreq - age * 30.0) * n1
                  + sin(dist * uWaveFreq * 1.7 + age * 15.0) * n2 * 0.4;
-    float signedIntensity = atFront * emWave * emDamping;
+    float emIntensity = atFront * abs(emWave) * emDamping;
 
-    // ── Chromatic dispersion into signed field ──
-    float specBase = abs(signedIntensity) * 0.4 + eNorm * 0.25 + age * 0.1;
-    float disp = 0.08;
-    waveFieldR += signedIntensity * energySpectrum(specBase - disp).r;
-    waveFieldG += signedIntensity * energySpectrum(specBase).g;
-    waveFieldB += signedIntensity * energySpectrum(specBase + disp).b;
+    // ── Chromatic dispersion: sample spectrum at 3 offsets ──
+    // Leading edge = higher frequency (blue-shifted)
+    // Trailing edge = lower frequency (red-shifted)
+    float spectrumBase = emIntensity * 0.4 + eNorm * 0.25 + age * 0.1;
+    float dispersion = 0.08; // Spectral spread between channels
+    vec3 waveColor = vec3(
+      energySpectrum(spectrumBase - dispersion).r,  // Red channel: trailing
+      energySpectrum(spectrumBase).g,                // Green channel: center
+      energySpectrum(spectrumBase + dispersion).b    // Blue channel: leading
+    );
+    catalystColor += waveColor * emIntensity * 0.5;
 
-    // ── Heat trail: slow-fading residue behind wavefront ──
-    float heatDamping = exp(-age * uWaveDamping * 0.15); // 6× slower decay
-    float behindWave = smoothstep(waveFront + 0.02, waveFront - 0.1, rawDist);
-    heatTrail += behindWave * heatDamping * 0.08;
-
-    // Lenz's Law
+    // Lenz's Law: inward drag that collapses to catalyst origin
+    // Uses rawDist (actual geometry, not warped visual distance)
     float collapsePhase = clamp(age * uWaveDamping * 0.5, 0.0, 1.0);
     float effectiveWake = uLenzWake * (1.0 - collapsePhase);
     float behindFront = smoothstep(waveFront, waveFront - max(effectiveWake, 0.001), rawDist);
+
     float pointCollapse = exp(-rawDist * rawDist * (20.0 + collapsePhase * 300.0));
+
     float lenzMask = mix(behindFront, pointCollapse, collapsePhase * collapsePhase);
+
     vec2 dirToCenter = (rawDist > 0.001) ? normalize(cat - warpedUV) : vec2(0.0);
     lenzDisplacement += dirToCenter * lenzMask * lenzDamping * uLenzStrength;
   }
 
-  // Convert signed interference field to color
-  // Positive = bright (constructive), negative = dark voids (destructive)
-  vec3 catalystColor = vec3(
-    max(waveFieldR, 0.0) * 0.5,
-    max(waveFieldG, 0.0) * 0.5,
-    max(waveFieldB, 0.0) * 0.5
-  );
-  // Destructive interference: darken underlying dust
-  float destructive = -min(min(waveFieldR, waveFieldG), waveFieldB);
-  float destMask = clamp(destructive * 0.3, 0.0, 0.5);
-
-  // Heat trail color: fades through spectrum
-  vec3 heatColor = energySpectrum(heatTrail * 3.0 + 0.1) * heatTrail;
-
   warpedUV += lenzDisplacement;
 
-  // ══════════════════════════════════════════
-  // QUANTUM DUST — Depth Parallax (3 layers)
-  // ══════════════════════════════════════════
+  // ── Quantum dust (visible at rest, energy-reactive colors) ──
   vec3 color = BLACK;
+
+  // Local energy intensity for color mapping
   float localHeat = eNorm * hoverInfluence;
 
-  // Mouse delta for parallax offset
-  vec2 parallaxDir = uv - mouse;
-
-  // Layer 1 (NEAR): fine white dust — most parallax
-  vec2 uv1 = warpedUV + parallaxDir * 0.04;
-  float dust1 = snoise(uv1 * 350.0 + t * speedMult * 0.5);
+  // Layer 1: fine white dust — always visible, shifts color with energy
+  float dust1 = snoise(warpedUV * 350.0 + t * speedMult * 0.5);
   float sparks1 = smoothstep(0.78, 0.85, dust1) * 0.07 * brightMult;
   vec3 dust1Color = mix(COLD_WHT, energySpectrum(localHeat * 0.8), localHeat);
   color += dust1Color * sparks1;
 
-  // Layer 2 (MID): violet dust — medium parallax
-  vec2 uv2 = warpedUV + parallaxDir * 0.02;
-  float dust2 = snoise(uv2 * 500.0 + t * speedMult * 0.7 + 100.0);
+  // Layer 2: violet dust — visible at rest, shifts through spectrum
+  float dust2 = snoise(warpedUV * 500.0 + t * speedMult * 0.7 + 100.0);
   float sparks2 = smoothstep(0.82, 0.88, dust2) * 0.035 * brightMult;
   vec3 dust2Color = mix(VIOLET * 0.6, energySpectrum(localHeat * 0.5 + 0.2), localHeat);
   color += dust2Color * sparks2;
 
-  // Layer 3 (FAR): dense field — minimal parallax
-  vec2 uv3 = warpedUV + parallaxDir * 0.008;
-  float dust3 = snoise(uv3 * 600.0 - t * speedMult * 0.3 + 50.0);
+  // Layer 3: dense field — faint at rest
+  float dust3 = snoise(warpedUV * 600.0 - t * speedMult * 0.3 + 50.0);
   float sparks3 = smoothstep(0.84, 0.90, dust3) * 0.025 * brightMult;
   vec3 dust3Color = mix(INDIGO * 0.5, energySpectrum(localHeat * 0.6 + 0.35), localHeat);
   color += dust3Color * sparks3;
 
-  // Layer 4: bright pops — near layer
-  vec2 uv4 = warpedUV + parallaxDir * 0.035;
+  // Layer 4: bright pops — white at rest, hottest spectrum at high energy
   float popThreshold = mix(0.90, 0.75, localHeat);
-  float pop = snoise(uv4 * 250.0 + t * speedMult * 2.2);
+  float pop = snoise(warpedUV * 250.0 + t * speedMult * 2.2);
   float brightPop = smoothstep(popThreshold, popThreshold + 0.04, pop) * 0.18 * brightMult;
   vec3 popColor = mix(COLD_WHT, energySpectrum(localHeat * 0.9 + 0.4), localHeat);
   color += popColor * brightPop;
-
-  // Apply destructive interference darkening
-  color *= (1.0 - destMask);
-
-  // Add heat trail residue
-  color += heatColor;
 
   // ══════════════════════════════════════════
   // LIVING CURSOR AURA — pattern-undetectable
