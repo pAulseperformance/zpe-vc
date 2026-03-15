@@ -397,7 +397,22 @@ void main() {
 
     // ── Heat trail: wave has passed this pixel? ──
     float wavePassed = 1.0 - smoothstep(waveFront - 0.02, waveFront, rawDist);
-    heatResidual += wavePassed * exp(-age * uHeatDecay);
+    // Barrier blocks heat too — no phantom glow through solid walls
+    float heatBarrierFactor = 1.0;
+    if (uBarrierEnabled > 0.5) {
+      bool hCatAbove = cat.y > uBarrierY;
+      bool hPixAbove = warpedUV.y > uBarrierY;
+      if (hCatAbove != hPixAbove) {
+        if (uSlitCount < 0.5) {
+          heatBarrierFactor = 0.02; // tunneling leak
+        } else {
+          // Heat passes through slits proportional to diffracted amplitude
+          vec2 hHuygens = huygensDiffraction(warpedUV, cat, uWaveFreq, age, uWaveSpeed);
+          heatBarrierFactor = clamp(hHuygens.y, 0.02, 1.0);
+        }
+      }
+    }
+    heatResidual += wavePassed * exp(-age * uHeatDecay) * heatBarrierFactor;
 
     // ── Lenz displacement ──
     vec2 dirToCenter = (rawDist > 0.001) ? normalize(cat - warpedUV) : vec2(0.0);
