@@ -1,13 +1,13 @@
 /**
  * SynthEngine — Pure TypeScript Web Audio DSP engine
  *
- * Zero React dependencies. Manages the AudioContext, oscillators,
+ * Zero React dependencies. Manages AudioContext, unison voices,
  * filter, analyser, and FFT band extraction.
  *
- * Signal chain:
- *   OscA (+7¢) ─┐
- *                ├→ VoiceGain → Filter → Panner → Analyser → MasterGain → Destination
- *   OscB (-7¢) ─┘
+ * Signal chain (per voice):
+ *   Osc[i] → VoicePanner[i] ─┐
+ *                              ├→ VoiceGain → Filter → MainPanner → Analyser → MasterGain → Dest
+ *   Osc[N] → VoicePanner[N] ─┘
  */
 
 import { snapToScale } from './quantizer'
@@ -23,14 +23,17 @@ export interface FFTBands {
 
 const MIN_FREQ = 65    // C2
 const MAX_FREQ = 523   // C5
-const DETUNE_CENTS = 7
+
+interface UnisonVoice {
+  osc: OscillatorNode
+  panner: StereoPannerNode
+}
 
 interface EngineNodes {
   ctx: AudioContext
   masterGain: GainNode
   mainPanner: StereoPannerNode
-  oscA: OscillatorNode
-  oscB: OscillatorNode
+  voices: UnisonVoice[]
   voiceGain: GainNode
   filter: BiquadFilterNode
   analyser: AnalyserNode
@@ -43,6 +46,9 @@ export class SynthEngine {
   private _active = false
   private smooth: FFTBands = { bass: 0, mid: 0, treble: 0 }
   private _scale: ScaleName = 'continuous'
+  private _unisonCount = 2
+  private _detuneSpread = 7 // cents total spread
+  private _currentFreq = MIN_FREQ
 
   /** Current FFT band levels (read per-frame) */
   fft: FFTBands = { bass: 0, mid: 0, treble: 0 }
@@ -54,7 +60,6 @@ export class SynthEngine {
 
   start(): void {
     if (this.nodes) return
-
     const ctx = new AudioContext()
 
     const masterGain = ctx.createGain()
@@ -81,28 +86,14 @@ export class SynthEngine {
     voiceGain.gain.value = 0
     voiceGain.connect(filter)
 
-    const oscA = ctx.createOscillator()
-    oscA.type = 'sine'
-    oscA.frequency.value = MIN_FREQ
-    oscA.detune.value = DETUNE_CENTS
-    oscA.connect(voiceGain)
-    oscA.start()
-
-    const oscB = ctx.createOscillator()
-    oscB.type = 'sine'
-    oscB.frequency.value = MIN_FREQ
-    oscB.detune.value = -DETUNE_CENTS
-    oscB.connect(voiceGain)
-    oscB.start()
+    const voices = this.buildVoices(ctx, voiceGain, 'sine', MIN_FREQ)
 
     this.nodes = {
-      ctx, masterGain, mainPanner,
-      oscA, oscB, voiceGain,
-      filter, analyser, fftData,
+      ctx, masterGain, mainPanner, voices,
+      voiceGain, filter, analyser, fftData,
       waveform: 'sine',
     }
     this._active = true
-
     masterGain.gain.setTargetAtTime(0.2, ctx.currentTime, 0.3)
   }
 
@@ -114,8 +105,7 @@ export class SynthEngine {
     const now = n.ctx.currentTime
     n.masterGain.gain.setTargetAtTime(0, now, 0.3)
     setTimeout(() => {
-      n.oscA.stop()
-      n.oscB.stop()
+      for (const v of n.voices) v.osc.stop()
       n.ctx.close()
       this.nodes = null
     }, 1500)
@@ -127,8 +117,7 @@ export class SynthEngine {
     const n = this.nodes
     if (!n) return
     n.waveform = wf
-    n.oscA.type = wf
-    n.oscB.type = wf
+    for (const v of n.voices) v.osc.type = wf
   }
 
   setFilterQ(q: number): void {
@@ -137,18 +126,26 @@ export class SynthEngine {
     n.filter.Q.setTargetAtTime(q, n.ctx.currentTime, 0.05)
   }
 
-  setScale(scale: ScaleName): void {
-    this._scale = scale
+  setScale(scale: ScaleName): void { this._scale = scale }
+
+  setUnisonCount(count: number): void {
+    const clamped = Math.max(1, Math.min(7, Math.round(count)))
+    if (clamped === this._unisonCount) return
+    this._unisonCount = clamped
+    this.rebuildVoices()
+  }
+
+  setDetuneSpread(cents: number): void {
+    this._detuneSpread = Math.max(0, Math.min(100, cents))
+    this.applyDetune()
   }
 
   // ── Per-Frame Update ───────────────────────────────────
 
   update(
-    energy: number,
-    maxEnergy: number,
+    energy: number, maxEnergy: number,
     interferenceRatio: number,
-    mouseX = 0.5,
-    mouseY?: number,
+    mouseX = 0.5, mouseY?: number,
   ): void {
     const n = this.nodes
     if (!n || !this._active) return
@@ -161,8 +158,10 @@ export class SynthEngine {
       const yInv = 1.0 - mouseY
       const rawFreq = MIN_FREQ * Math.pow(MAX_FREQ / MIN_FREQ, yInv)
       const freq = snapToScale(rawFreq, this._scale)
-      n.oscA.frequency.setTargetAtTime(freq, now, 0.08)
-      n.oscB.frequency.setTargetAtTime(freq, now, 0.08)
+      this._currentFreq = freq
+      for (const v of n.voices) {
+        v.osc.frequency.setTargetAtTime(freq, now, 0.08)
+      }
     }
 
     // Filter cutoff: mouse X → 200Hz-8kHz
@@ -175,10 +174,8 @@ export class SynthEngine {
     n.voiceGain.gain.setTargetAtTime(vol, now, 0.05)
 
     // Panning
-    const panTarget = (mouseX - 0.5) * 2.0
-    n.mainPanner.pan.setTargetAtTime(panTarget, now, 0.1)
+    n.mainPanner.pan.setTargetAtTime((mouseX - 0.5) * 2.0, now, 0.1)
 
-    // FFT analysis
     this.analyzFFT(n)
   }
 
@@ -189,15 +186,15 @@ export class SynthEngine {
     if (!n || !this._active) return
 
     const now = n.ctx.currentTime
+
+    // Tonal click
     const clickOsc = n.ctx.createOscillator()
     const clickGain = n.ctx.createGain()
-
     clickOsc.type = n.waveform
     clickOsc.frequency.value = 400 + Math.random() * 600
-
     clickGain.gain.setValueAtTime(0, now)
-    clickGain.gain.linearRampToValueAtTime(0.12, now + 0.01)
-    clickGain.gain.linearRampToValueAtTime(0.04, now + 0.06)
+    clickGain.gain.linearRampToValueAtTime(0.10, now + 0.01)
+    clickGain.gain.linearRampToValueAtTime(0.03, now + 0.06)
     clickGain.gain.linearRampToValueAtTime(0, now + 0.16)
 
     const panner = n.ctx.createStereoPanner()
@@ -206,9 +203,11 @@ export class SynthEngine {
     clickOsc.connect(clickGain)
     clickGain.connect(panner)
     panner.connect(n.analyser)
-
     clickOsc.start(now)
     clickOsc.stop(now + 0.2)
+
+    // Noise burst — adds percussive "click" texture
+    this.fireNoiseBurst(n, mapX, 0.04, 0.08)
   }
 
   playNote(freq: number, velocity = 0.8): void {
@@ -216,23 +215,12 @@ export class SynthEngine {
     if (!n || !this._active) return
 
     const now = n.ctx.currentTime
-    const osc = n.ctx.createOscillator()
-    const oscB = n.ctx.createOscillator()
-    const gain = n.ctx.createGain()
     const noteFilter = n.ctx.createBiquadFilter()
-
-    osc.type = n.waveform
-    osc.frequency.value = freq
-    osc.detune.value = DETUNE_CENTS
-
-    oscB.type = n.waveform
-    oscB.frequency.value = freq
-    oscB.detune.value = -DETUNE_CENTS
-
     noteFilter.type = 'lowpass'
     noteFilter.frequency.value = n.filter.frequency.value
     noteFilter.Q.value = n.filter.Q.value
 
+    const gain = n.ctx.createGain()
     const vol = velocity * 0.2
     gain.gain.setValueAtTime(0, now)
     gain.gain.linearRampToValueAtTime(vol, now + 0.015)
@@ -240,18 +228,121 @@ export class SynthEngine {
     gain.gain.setValueAtTime(vol * 0.6, now + 0.25)
     gain.gain.linearRampToValueAtTime(0, now + 0.5)
 
-    osc.connect(noteFilter)
-    oscB.connect(noteFilter)
+    // Spawn unison voices for this note
+    const count = this._unisonCount
+    for (let i = 0; i < count; i++) {
+      const osc = n.ctx.createOscillator()
+      osc.type = n.waveform
+      osc.frequency.value = freq
+      osc.detune.value = this.detuneForIndex(i, count)
+
+      const vPan = n.ctx.createStereoPanner()
+      vPan.pan.value = this.panForIndex(i, count)
+
+      osc.connect(vPan)
+      vPan.connect(noteFilter)
+      osc.start(now)
+      osc.stop(now + 0.55)
+    }
+
     noteFilter.connect(gain)
     gain.connect(n.analyser)
-
-    osc.start(now)
-    oscB.start(now)
-    osc.stop(now + 0.55)
-    oscB.stop(now + 0.55)
   }
 
-  // ── Internal ───────────────────────────────────────────
+  // ── Internal: Voice Management ─────────────────────────
+
+  private buildVoices(
+    ctx: AudioContext, dest: GainNode,
+    waveform: SynthWaveform, freq: number,
+  ): UnisonVoice[] {
+    const voices: UnisonVoice[] = []
+    const count = this._unisonCount
+
+    for (let i = 0; i < count; i++) {
+      const panner = ctx.createStereoPanner()
+      panner.pan.value = this.panForIndex(i, count)
+      panner.connect(dest)
+
+      const osc = ctx.createOscillator()
+      osc.type = waveform
+      osc.frequency.value = freq
+      osc.detune.value = this.detuneForIndex(i, count)
+      osc.connect(panner)
+      osc.start()
+
+      voices.push({ osc, panner })
+    }
+    return voices
+  }
+
+  private rebuildVoices(): void {
+    const n = this.nodes
+    if (!n) return
+    // Stop old voices
+    for (const v of n.voices) {
+      v.osc.stop()
+      v.osc.disconnect()
+      v.panner.disconnect()
+    }
+    // Build new
+    n.voices = this.buildVoices(
+      n.ctx, n.voiceGain, n.waveform, this._currentFreq,
+    )
+  }
+
+  private applyDetune(): void {
+    const n = this.nodes
+    if (!n) return
+    const count = n.voices.length
+    for (let i = 0; i < count; i++) {
+      n.voices[i].osc.detune.value = this.detuneForIndex(i, count)
+      n.voices[i].panner.pan.value = this.panForIndex(i, count)
+    }
+  }
+
+  /** Detune for voice i out of count total, spread across ±_detuneSpread */
+  private detuneForIndex(i: number, count: number): number {
+    if (count === 1) return 0
+    // Distribute evenly: -spread/2 ... 0 ... +spread/2
+    return -this._detuneSpread / 2 + (i / (count - 1)) * this._detuneSpread
+  }
+
+  /** Stereo pan for voice i: spread from -0.8 to +0.8 */
+  private panForIndex(i: number, count: number): number {
+    if (count === 1) return 0
+    return -0.8 + (i / (count - 1)) * 1.6
+  }
+
+  // ── Internal: Noise ────────────────────────────────────
+
+  private fireNoiseBurst(
+    n: EngineNodes, panX: number, volume: number, duration: number,
+  ): void {
+    const now = n.ctx.currentTime
+    const bufferSize = Math.floor(n.ctx.sampleRate * duration)
+    const buffer = n.ctx.createBuffer(1, bufferSize, n.ctx.sampleRate)
+    const data = buffer.getChannelData(0)
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize) // decay envelope baked in
+    }
+
+    const src = n.ctx.createBufferSource()
+    src.buffer = buffer
+    const gain = n.ctx.createGain()
+    gain.gain.setValueAtTime(volume, now)
+    gain.gain.linearRampToValueAtTime(0, now + duration)
+
+    const panner = n.ctx.createStereoPanner()
+    panner.pan.value = (panX - 0.5) * 2.0
+
+    src.connect(gain)
+    gain.connect(panner)
+    panner.connect(n.analyser)
+    src.start(now)
+    src.stop(now + duration)
+  }
+
+  // ── Internal: FFT ──────────────────────────────────────
 
   private analyzFFT(n: EngineNodes): void {
     n.analyser.getByteFrequencyData(n.fftData)

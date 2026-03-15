@@ -10,6 +10,10 @@ interface SynthControlsProps {
   onAudioReactiveChange: (v: boolean) => void
   scale: ScaleName
   onScaleChange: (s: ScaleName) => void
+  unisonCount: number
+  onUnisonCountChange: (n: number) => void
+  detuneSpread: number
+  onDetuneSpreadChange: (c: number) => void
   fftRef: MutableRefObject<FFTBands>
 }
 
@@ -36,6 +40,8 @@ export function SynthControls({
   filterQ, onFilterQChange,
   audioReactive, onAudioReactiveChange,
   scale, onScaleChange,
+  unisonCount, onUnisonCountChange,
+  detuneSpread, onDetuneSpreadChange,
   fftRef,
 }: SynthControlsProps) {
   const bands = fftRef.current
@@ -81,6 +87,28 @@ export function SynthControls({
           className="flex-1 h-1 accent-electric-purple"
         />
         <span className="text-[0.55rem] w-8 text-right">{filterQ.toFixed(1)}</span>
+      </div>
+
+      {/* Unison voices */}
+      <div className="flex items-center gap-2 mt-1.5">
+        <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Unison</span>
+        <input
+          type="range" min={1} max={7} step={1} value={unisonCount}
+          onChange={e => onUnisonCountChange(Number(e.target.value))}
+          className="flex-1 h-1 accent-electric-purple"
+        />
+        <span className="text-[0.55rem] w-8 text-right">{unisonCount}×</span>
+      </div>
+
+      {/* Detune spread */}
+      <div className="flex items-center gap-2 mt-1.5">
+        <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Detune</span>
+        <input
+          type="range" min={0} max={100} step={1} value={detuneSpread}
+          onChange={e => onDetuneSpreadChange(Number(e.target.value))}
+          className="flex-1 h-1 accent-electric-purple"
+        />
+        <span className="text-[0.55rem] w-8 text-right">{detuneSpread}¢</span>
       </div>
 
       {/* Audio Reactivity toggle */}

@@ -43,6 +43,14 @@ export function useSynth() {
     getEngine().setScale(scale)
   }, [])
 
+  const setUnisonCount = useCallback((count: number) => {
+    getEngine().setUnisonCount(count)
+  }, [])
+
+  const setDetuneSpread = useCallback((cents: number) => {
+    getEngine().setDetuneSpread(cents)
+  }, [])
+
   const update = useCallback((
     energy: number,
     maxEnergy: number,
@@ -67,6 +75,7 @@ export function useSynth() {
   return {
     start, stop, update, triggerClick, playNote,
     setWaveform, setFilterQ, setScale,
+    setUnisonCount, setDetuneSpread,
     activeRef,
     fftRef: fftRef as MutableRefObject<FFTBands>,
   }

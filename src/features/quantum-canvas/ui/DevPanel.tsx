@@ -42,10 +42,14 @@ interface DevPanelProps {
   onAudioReactive: (v: boolean) => void
   synthScale: ScaleName
   onSynthScale: (s: ScaleName) => void
+  unisonCount: number
+  onUnisonCount: (n: number) => void
+  detuneSpread: number
+  onDetuneSpread: (c: number) => void
   fftRef: MutableRefObject<FFTBands>
 }
 
-export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, hideCursor, onCursorHideChange, gravBodyPositions, canvasRef, synthWaveform, onSynthWaveform, synthFilterQ, onSynthFilterQ, audioReactive, onAudioReactive, synthScale, onSynthScale, fftRef }: DevPanelProps) {
+export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, hideCursor, onCursorHideChange, gravBodyPositions, canvasRef, synthWaveform, onSynthWaveform, synthFilterQ, onSynthFilterQ, audioReactive, onAudioReactive, synthScale, onSynthScale, unisonCount, onUnisonCount, detuneSpread, onDetuneSpread, fftRef }: DevPanelProps) {
   const [collapsed, setCollapsed] = useState(false)
   const sim = useAutoSim({ onSimClick, onSimMouseActiveChange, onSimMouseUpdate, zoomMode: tuning.zoomMode })
 
@@ -111,6 +115,10 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           onAudioReactiveChange={onAudioReactive}
           scale={synthScale}
           onScaleChange={onSynthScale}
+          unisonCount={unisonCount}
+          onUnisonCountChange={onUnisonCount}
+          detuneSpread={detuneSpread}
+          onDetuneSpreadChange={onDetuneSpread}
           fftRef={fftRef}
         />
       )}
@@ -198,6 +206,8 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           synthFilterQ,
           audioReactive,
           synthScale,
+          unisonCount,
+          detuneSpread,
           hideCursor,
         }}
         onChange={(loadedTuning) => {
@@ -223,6 +233,8 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           if (loadedTuning.synthFilterQ !== undefined) onSynthFilterQ(loadedTuning.synthFilterQ)
           if (loadedTuning.audioReactive !== undefined) onAudioReactive(loadedTuning.audioReactive)
           if (loadedTuning.synthScale) onSynthScale(loadedTuning.synthScale as ScaleName)
+          if (loadedTuning.unisonCount !== undefined) onUnisonCount(loadedTuning.unisonCount)
+          if (loadedTuning.detuneSpread !== undefined) onDetuneSpread(loadedTuning.detuneSpread)
           if (loadedTuning.hideCursor !== undefined) onCursorHideChange(loadedTuning.hideCursor)
         }}
         canvasRef={canvasRef}

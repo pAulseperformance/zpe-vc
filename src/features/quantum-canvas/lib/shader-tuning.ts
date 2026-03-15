@@ -53,6 +53,8 @@ export interface ShaderTuning {
   synthFilterQ?: number
   audioReactive?: boolean
   synthScale?: string   // Scale quantizer: 'continuous' | 'minor-pentatonic' | etc.
+  unisonCount?: number  // 1-7 oscillators per voice
+  detuneSpread?: number // Cents of detune spread across unison voices
   // UI
   hideCursor?: boolean
 }
@@ -102,6 +104,8 @@ export const DEFAULT_TUNING: ShaderTuning = {
   synthFilterQ: 2.0,
   audioReactive: true,
   synthScale: 'continuous',
+  unisonCount: 2,
+  detuneSpread: 7,
   // UI defaults
   hideCursor: true,
 }

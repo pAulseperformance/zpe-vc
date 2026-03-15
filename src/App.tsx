@@ -30,6 +30,8 @@ export default function App() {
   const [synthFilterQ, setSynthFilterQ] = useState(2.0)
   const [audioReactive, setAudioReactive] = useState(true)
   const [synthScale, setSynthScale] = useState<ScaleName>('continuous')
+  const [unisonCount, setUnisonCount] = useState(2)
+  const [detuneSpread, setDetuneSpread] = useState(7)
 
   // Dev mode — unlocked after rip boot sequence OR always in dev
   const [devUnlocked, setDevUnlocked] = useState(IS_DEV)
@@ -181,6 +183,10 @@ export default function App() {
           onAudioReactive={setAudioReactive}
           synthScale={synthScale}
           onSynthScale={(s) => { setSynthScale(s); audio.setScale(s) }}
+          unisonCount={unisonCount}
+          onUnisonCount={(n) => { setUnisonCount(n); audio.setUnisonCount(n) }}
+          detuneSpread={detuneSpread}
+          onDetuneSpread={(c) => { setDetuneSpread(c); audio.setDetuneSpread(c) }}
           fftRef={audio.fftRef}
         />
       )}
