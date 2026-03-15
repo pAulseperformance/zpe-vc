@@ -68,30 +68,25 @@ float sdPolygon(vec2 p, float r, float n) {
 vec3 idleJitter(vec2 uv, float t) {
   vec3 color = BLACK;
 
-  // Layer 1: Very fine microscopic noise — cosmic dust
-  // Scaled WAY up (200+) so the features are tiny pinpoints
-  float dust1 = snoise(uv * 250.0 + t * 0.4);
-  float dust2 = snoise(uv * 300.0 - t * 0.3 + 42.0);
-
-  // Only the very peaks become visible — extremely sparse
-  float sparks = smoothstep(0.75, 0.82, dust1) * 0.08;
+  // Layer 1: Microscopic white dust — high frequency
+  float dust1 = snoise(uv * 350.0 + t * 0.5);
+  float sparks = smoothstep(0.78, 0.85, dust1) * 0.07;
   color += WHITE * sparks;
 
-  // Layer 2: Even finer secondary dust — purple tinted
-  float fineNoise = snoise(uv * 400.0 + t * 0.6 + 100.0);
-  float fineSparks = smoothstep(0.80, 0.86, fineNoise) * 0.04;
-  color += PURPLE * fineSparks;
+  // Layer 2: Even finer purple-tinted dust
+  float dust2 = snoise(uv * 500.0 + t * 0.7 + 100.0);
+  float purpleSparks = smoothstep(0.82, 0.88, dust2) * 0.035;
+  color += PURPLE * purpleSparks;
 
-  // Layer 3: Ultra-faint slow-moving haze — gives sense of depth
-  // NOT circles or blobs — just barely-perceptible field variation
-  float haze = snoise(uv * 8.0 + t * 0.02);
-  haze = haze * 0.5 + 0.5;
-  float hazeVisible = smoothstep(0.52, 0.7, haze) * 0.012;
-  color += PURPLE * hazeVisible;
+  // Layer 3: Microscopic depth variation (NOT haze blobs)
+  // High freq so it reads as dense star field, not camouflage
+  float field = snoise(uv * 600.0 - t * 0.3 + 50.0);
+  float fieldSparks = smoothstep(0.84, 0.90, field) * 0.025;
+  color += mix(PURPLE, WHITE, 0.4) * fieldSparks;
 
-  // Layer 4: Rare bright particle pops — fleeting virtual particles
-  float pop = snoise(uv * 180.0 + t * 2.0);
-  float brightPop = smoothstep(0.88, 0.92, pop) * 0.15;
+  // Layer 4: Rare bright virtual particle pops
+  float pop = snoise(uv * 250.0 + t * 2.2);
+  float brightPop = smoothstep(0.90, 0.94, pop) * 0.18;
   color += WHITE * brightPop;
 
   return color;
@@ -107,28 +102,34 @@ vec3 hoverField(vec2 uv, float t, vec2 mouse) {
 
   vec2 toMouse = uv - mouse;
   float mouseDist = length(toMouse);
-  vec2 mouseDir = normalize(toMouse + 0.0001);
 
-  // Influence falloff — tight, subtle
-  float influence = exp(-mouseDist * mouseDist * 18.0);
+  // Influence falloff — how close to cursor
+  float influence = exp(-mouseDist * mouseDist * 12.0);
 
-  // Directional noise aligned to mouse vector
-  // Project UV onto mouse direction for wave-like alignment
-  float projection = dot(uv - mouse, mouseDir);
-  float perpProjection = dot(uv - mouse, vec2(-mouseDir.y, mouseDir.x));
+  // ── PARALLEL TRANSVERSE WAVES — NOT RADIAL ──
+  // Fixed wave direction that slowly rotates with time
+  float waveAngle = t * 0.15;
+  vec2 waveDir = vec2(cos(waveAngle), sin(waveAngle));
+  vec2 perpDir = vec2(-waveDir.y, waveDir.x);
 
-  // Stretched noise along mouse direction — creates alignment effect
-  float aligned = snoise(vec2(projection * 80.0, perpProjection * 200.0) + t * 1.5);
-  float alignedSparks = smoothstep(0.6, 0.75, aligned) * influence * 0.08;
-  color += WHITE * alignedSparks;
+  // Project UV onto wave direction — creates PARALLEL lines
+  float para = dot(uv, waveDir);
+  float perp = dot(uv, perpDir);
 
-  // Faint purple glow right at cursor — very subtle, small
-  color += PURPLE * exp(-mouseDist * mouseDist * 80.0) * 0.06;
+  // Primary parallel wave — clean sine, NOT radial
+  float wave1 = sin(para * 50.0 + t * 2.0) * 0.5 + 0.5;
+  float waveLine = smoothstep(0.7, 0.8, wave1) * influence * 0.07;
+  color += WHITE * waveLine;
 
-  // Directional streaks — faint lines of aligned particles
-  float streaks = snoise(vec2(projection * 40.0 + t * 0.8, perpProjection * 120.0));
-  float streakLine = smoothstep(0.7, 0.8, streaks) * influence * 0.05;
-  color += mix(BLUE, WHITE, 0.5) * streakLine;
+  // Secondary perpendicular wave — creates grid-like interference
+  float wave2 = sin(perp * 50.0 - t * 1.5) * 0.5 + 0.5;
+  float crossLine = smoothstep(0.75, 0.85, wave2) * influence * 0.04;
+  color += BLUE * crossLine;
+
+  // Microscopic aligned dust within the influence zone
+  float alignedDust = snoise(vec2(para * 200.0, perp * 400.0) + t);
+  float dustSparks = smoothstep(0.75, 0.85, alignedDust) * influence * 0.05;
+  color += mix(PURPLE, WHITE, 0.6) * dustSparks;
 
   return color;
 }
