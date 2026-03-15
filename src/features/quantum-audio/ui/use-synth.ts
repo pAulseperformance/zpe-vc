@@ -1,4 +1,4 @@
-import { useRef, useCallback, type MutableRefObject } from 'react'
+import { useRef, useCallback, useMemo, type MutableRefObject } from 'react'
 import { SynthEngine } from '../lib/synth-engine'
 import type { SynthWaveform, FFTBands } from '../lib/synth-engine'
 import type { ScaleName } from '../lib/quantizer'
@@ -60,6 +60,8 @@ export function useSynth() {
   const setDistortion = useCallback((v: number) => { getEngine().setDistortion(v) }, [])
   const setAutoDistortion = useCallback((on: boolean) => { getEngine().setAutoDistortion(on) }, [])
   const setVolume = useCallback((v: number) => { getEngine().setVolume(v) }, [])
+  const setDroneVolume = useCallback((v: number) => { getEngine().setDroneVolume(v) }, [])
+  const setNotesVolume = useCallback((v: number) => { getEngine().setNotesVolume(v) }, [])
   const setEnvelope = useCallback((a: number, d: number, s: number, r: number) => {
     getEngine().setEnvelope(a, d, s, r)
   }, [])
@@ -85,16 +87,26 @@ export function useSynth() {
     return getEngine().playNote(freq, velocity, sustained)
   }, [])
 
-  return {
+  // Stable reference — prevents useEffect re-runs that kill sustained notes
+  return useMemo(() => ({
     start, stop, update, triggerClick, playNote,
     setWaveform, setFilterQ, setScale,
     setUnisonCount, setDetuneSpread,
     setDelayTime, setDelayFeedback, setDelayMix,
     setReverbMix, setReverbDecay,
-    setDistortion, setAutoDistortion, setVolume, setEnvelope,
+    setDistortion, setAutoDistortion, setVolume,
+    setDroneVolume, setNotesVolume, setEnvelope,
     activeRef,
     fftRef: fftRef as MutableRefObject<FFTBands>,
-  }
+  }), [
+    start, stop, update, triggerClick, playNote,
+    setWaveform, setFilterQ, setScale,
+    setUnisonCount, setDetuneSpread,
+    setDelayTime, setDelayFeedback, setDelayMix,
+    setReverbMix, setReverbDecay,
+    setDistortion, setAutoDistortion, setVolume,
+    setDroneVolume, setNotesVolume, setEnvelope,
+  ])
 }
 
 export type { SynthWaveform, FFTBands, ScaleName }

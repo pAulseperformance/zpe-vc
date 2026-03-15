@@ -50,6 +50,8 @@ export interface ShaderTuning {
   // Audio / Synth
   audioEnabled?: boolean
   masterVolume?: number  // 0-1 overall volume
+  droneVolume?: number   // 0-1 continuous drone level
+  notesVolume?: number   // 0-1 keyboard/click notes level
   synthWaveform?: 'sine' | 'sawtooth' | 'square' | 'triangle'
   synthFilterQ?: number
   audioReactive?: boolean
@@ -119,6 +121,8 @@ export const DEFAULT_TUNING: ShaderTuning = {
   // Audio defaults
   audioEnabled: false,
   masterVolume: 0.8,
+  droneVolume: 0.5,
+  notesVolume: 0.8,
   synthWaveform: 'sine',
   synthFilterQ: 2.0,
   audioReactive: true,

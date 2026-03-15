@@ -16,6 +16,10 @@ interface SynthControlsProps {
   onDetuneSpreadChange: (c: number) => void
   volume: number
   onVolumeChange: (v: number) => void
+  droneVolume: number
+  onDroneVolumeChange: (v: number) => void
+  notesVolume: number
+  onNotesVolumeChange: (v: number) => void
   fftRef: MutableRefObject<FFTBands>
 }
 
@@ -45,6 +49,8 @@ export function SynthControls({
   unisonCount, onUnisonCountChange,
   detuneSpread, onDetuneSpreadChange,
   volume, onVolumeChange,
+  droneVolume, onDroneVolumeChange,
+  notesVolume, onNotesVolumeChange,
   fftRef,
 }: SynthControlsProps) {
   const bands = fftRef.current
@@ -60,6 +66,22 @@ export function SynthControls({
           onChange={e => onVolumeChange(Number(e.target.value))}
           className="flex-1 h-1 accent-electric-purple" />
         <span className="text-[0.55rem] w-8 text-right">{(volume * 100).toFixed(0)}%</span>
+      </div>
+
+      {/* Drone / Notes volume */}
+      <div className="flex items-center gap-2 mt-1.5">
+        <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Drone</span>
+        <input type="range" min={0} max={1} step={0.01} value={droneVolume}
+          onChange={e => onDroneVolumeChange(Number(e.target.value))}
+          className="flex-1 h-1 accent-cyan-400" />
+        <span className="text-[0.55rem] w-8 text-right">{(droneVolume * 100).toFixed(0)}%</span>
+      </div>
+      <div className="flex items-center gap-2 mt-1.5">
+        <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Notes</span>
+        <input type="range" min={0} max={1} step={0.01} value={notesVolume}
+          onChange={e => onNotesVolumeChange(Number(e.target.value))}
+          className="flex-1 h-1 accent-fuchsia-400" />
+        <span className="text-[0.55rem] w-8 text-right">{(notesVolume * 100).toFixed(0)}%</span>
       </div>
 
       {/* Waveform selector */}

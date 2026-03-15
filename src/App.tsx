@@ -33,6 +33,8 @@ export default function App() {
   const [unisonCount, setUnisonCount] = useState(2)
   const [detuneSpread, setDetuneSpread] = useState(7)
   const [masterVolume, setMasterVolume] = useState(0.8)
+  const [droneVolume, setDroneVolume] = useState(0.5)
+  const [notesVolume, setNotesVolume] = useState(0.8)
   // FX state
   const [delayTime, setDelayTime] = useState(0.3)
   const [delayFeedback, setDelayFeedback] = useState(0.4)
@@ -232,6 +234,10 @@ export default function App() {
           onAudioToggle={setAudioEnabled}
           masterVolume={masterVolume}
           onMasterVolume={(v) => { setMasterVolume(v); audio.setVolume(v) }}
+          droneVolume={droneVolume}
+          onDroneVolume={(v) => { setDroneVolume(v); audio.setDroneVolume(v) }}
+          notesVolume={notesVolume}
+          onNotesVolume={(v) => { setNotesVolume(v); audio.setNotesVolume(v) }}
           hideCursor={hideCursor}
           onCursorHideChange={setHideCursor}
           gravBodyPositions={gravBodyPositionsRef}

@@ -53,6 +53,7 @@ export class SynthEngine {
   private _detuneSpread = 7 // cents total spread
   private _currentFreq = MIN_FREQ
   private _autoDistortion = false
+  private _droneVolumeScale = 0.5
   private _envelope = { attack: 0.015, decay: 0.085, sustain: 0.6, release: 0.25 }
   readonly fx = new FXChain()
 
@@ -163,6 +164,16 @@ export class SynthEngine {
     n.masterVolume.gain.setTargetAtTime(Math.max(0, Math.min(1, v)), n.ctx.currentTime, 0.05)
   }
 
+  setDroneVolume(v: number): void {
+    this._droneVolumeScale = Math.max(0, Math.min(1, v))
+  }
+
+  setNotesVolume(v: number): void {
+    const n = this.nodes
+    if (!n) return
+    n.notesGain.gain.setTargetAtTime(Math.max(0, Math.min(1, v)), n.ctx.currentTime, 0.05)
+  }
+
   setEnvelope(a: number, d: number, s: number, r: number): void {
     this._envelope = {
       attack: Math.max(0.001, a),
@@ -214,7 +225,7 @@ export class SynthEngine {
 
     // Voice volume: energy-gated with interference modulation
     const iRatio = Math.max(0, Math.min(1, interferenceRatio))
-    const vol = eNorm * 0.35 * (0.5 + iRatio * 0.5)
+    const vol = eNorm * 0.35 * (0.5 + iRatio * 0.5) * this._droneVolumeScale
     n.voiceGain.gain.setTargetAtTime(vol, now, 0.05)
 
     // Panning
