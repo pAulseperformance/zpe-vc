@@ -106,7 +106,9 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
   }
 
   return (
-    <div className="fixed top-3 right-3 z-50 w-72 max-h-[85vh] overflow-y-auto flex flex-col bg-black/90 border border-electric-purple/30 rounded-lg p-3 font-mono text-xs text-cold-white-dim backdrop-blur-sm scrollbar-thin scrollbar-track-transparent scrollbar-thumb-electric-purple/20 hover:scrollbar-thumb-electric-purple/40" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(168,85,247,0.2) transparent' }}>
+    <div className="fixed top-3 right-3 z-50 w-72 max-h-[85vh] flex flex-col bg-black/90 border border-electric-purple/30 rounded-lg font-mono text-xs text-cold-white-dim backdrop-blur-sm">
+      {/* Pinned header */}
+      <div className="flex-shrink-0 p-3 pb-0">
       <PanelHeader
         audioEnabled={audioEnabled}
         onAudioToggle={onAudioToggle}
@@ -140,6 +142,10 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
         onReset={() => onChange({ ...DEFAULT_TUNING })}
         onCollapse={() => setCollapsed(true)}
       />
+      </div>
+
+      {/* Scrollable body */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-3 pt-2" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(168,85,247,0.2) transparent' }}>
 
       {audioEnabled && (
         <>
@@ -239,8 +245,8 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
         </button>
       </div>
 
-      {/* Scrollable body */}
-      <div className="flex-1 overflow-y-auto pr-1 space-y-1.5">
+
+
         {/* Mouse / God Object */}
         <div className="text-[0.55rem] text-electric-purple/50 uppercase tracking-widest mt-1 mb-0.5 border-b border-electric-purple/10 pb-0.5">🖱 Mouse (God Object)</div>
         <button 

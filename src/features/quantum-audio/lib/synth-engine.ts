@@ -257,7 +257,7 @@ export class SynthEngine {
     noteFilter.Q.value = n.filter.Q.value
 
     const gain = ctx.createGain()
-    const vol = velocity * 0.2
+    const vol = velocity * 0.4
     const { attack, decay, sustain, release } = this._envelope
 
     // Attack → Decay → Sustain level
