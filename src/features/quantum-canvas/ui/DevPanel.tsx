@@ -9,7 +9,7 @@ import { BarrierControls } from './BarrierControls'
 import { ExportControls } from './ExportControls'
 import { SynthControls } from './SynthControls'
 import { SliderGroup } from './SliderGroup'
-import type { SynthWaveform, FFTBands } from '../lib/use-quantum-audio'
+import type { SynthWaveform, FFTBands } from '@/features/quantum-audio'
 
 export type { ShaderTuning }
 export { DEFAULT_TUNING } from '../lib/shader-tuning'

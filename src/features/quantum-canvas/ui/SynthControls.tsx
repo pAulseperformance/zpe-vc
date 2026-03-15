@@ -1,5 +1,5 @@
 import type { MutableRefObject } from 'react'
-import type { SynthWaveform, FFTBands } from '../lib/use-quantum-audio'
+import type { SynthWaveform, FFTBands } from '@/features/quantum-audio'
 
 interface SynthControlsProps {
   waveform: SynthWaveform
