@@ -13,6 +13,10 @@ export interface ShaderTuning {
   velocityMult: number
   clickSpike: number
   ripThreshold: number
+  parallaxDepth: number
+  heatDecay: number
+  heatIntensity: number
+  interferenceBlend: number
 }
 
 export const DEFAULT_TUNING: ShaderTuning = {
@@ -28,6 +32,10 @@ export const DEFAULT_TUNING: ShaderTuning = {
   velocityMult: 15.0,
   clickSpike: 20.0,
   ripThreshold: 100.0,
+  parallaxDepth: 0.04,
+  heatDecay: 1.5,
+  heatIntensity: 0.2,
+  interferenceBlend: 1.0,
 }
 
 const STORAGE_KEY = 'zpe-shader-presets'
@@ -54,6 +62,10 @@ const SLIDERS: SliderDef[] = [
   { key: 'velocityMult', label: 'Velocity Mult', min: 5, max: 60, step: 5 },
   { key: 'clickSpike', label: 'Click Spike', min: 5, max: 50, step: 5 },
   { key: 'ripThreshold', label: 'Rip Threshold', min: 30, max: 200, step: 10 },
+  { key: 'parallaxDepth', label: 'Parallax', min: 0.0, max: 0.15, step: 0.005 },
+  { key: 'heatDecay', label: 'Heat Decay', min: 0.2, max: 5.0, step: 0.1 },
+  { key: 'heatIntensity', label: 'Heat Intensity', min: 0.0, max: 1.0, step: 0.05 },
+  { key: 'interferenceBlend', label: 'Interference', min: 0.0, max: 1.0, step: 0.05 },
 ]
 
 /* ─── Preset helpers ─── */

@@ -57,6 +57,10 @@ function ShaderPlane({ onRip, tuning, onEnergyChange }: ShaderPlaneProps) {
       uLenzWake: { value: tuning.lenzWake },
       uHoverRadius: { value: tuning.hoverRadius },
       uWaveLifetime: { value: tuning.waveLifetime },
+      uParallaxDepth: { value: tuning.parallaxDepth },
+      uHeatDecay: { value: tuning.heatDecay },
+      uHeatIntensity: { value: tuning.heatIntensity },
+      uInterferenceBlend: { value: tuning.interferenceBlend },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
@@ -157,6 +161,10 @@ function ShaderPlane({ onRip, tuning, onEnergyChange }: ShaderPlaneProps) {
     mat.uniforms.uLenzWake.value = t.lenzWake
     mat.uniforms.uHoverRadius.value = t.hoverRadius
     mat.uniforms.uWaveLifetime.value = t.waveLifetime
+    mat.uniforms.uParallaxDepth.value = t.parallaxDepth
+    mat.uniforms.uHeatDecay.value = t.heatDecay
+    mat.uniforms.uHeatIntensity.value = t.heatIntensity
+    mat.uniforms.uInterferenceBlend.value = t.interferenceBlend
   })
 
   return (
