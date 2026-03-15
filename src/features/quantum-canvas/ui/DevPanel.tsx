@@ -202,6 +202,16 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
       />
       <BarrierControls tuning={tuning} onChange={onChange} />
       <AutoSimControls sim={sim} />
+
+      {/* Gravity body position indicators */}
+      {sim.simMode === 'gravity' && sim.simActive && (
+        <div className="mt-2 border-t border-cold-white-dim/10 pt-1.5">
+          <span className="text-[0.55rem] text-cold-white-dim/30">Gravity Bodies: </span>
+          <span className="text-[0.55rem] text-cyan-400">● Mouse ({sim.gravState.current.mousePos.x.toFixed(2)}, {sim.gravState.current.mousePos.y.toFixed(2)})</span>
+          <span className="text-[0.55rem] text-cold-white-dim/20"> │ </span>
+          <span className="text-[0.55rem] text-fuchsia-400">● Click ({sim.gravState.current.clickPos.x.toFixed(2)}, {sim.gravState.current.clickPos.y.toFixed(2)})</span>
+        </div>
+      )}
     </div>
   )
 }

@@ -42,6 +42,7 @@ uniform float uStarField;   // 0 = off, 1 = full brightness
 uniform float uWavelength;  // 0=radio, 1=infrared, 2=visible, 3=xray, 4=gamma
 uniform float uPointerHover;
 uniform float uHoverWarp;
+uniform float uSpinSpeed;
 
 // ─── Barrier / Diffraction Uniforms ───
 uniform float uBarrierEnabled;  // 0=off, 1=on
@@ -529,10 +530,10 @@ void main() {
 
   // ── Infinite Parallax Spin Matrices ──
   // Deeper layers rotate slower, creating a 3D vortex
-  float a1 = t * 0.015; mat2 rot1 = mat2(cos(a1), -sin(a1), sin(a1), cos(a1));
-  float a2 = t * 0.022; mat2 rot2 = mat2(cos(a2), -sin(a2), sin(a2), cos(a2));
-  float a3 = t * 0.030; mat2 rot3 = mat2(cos(a3), -sin(a3), sin(a3), cos(a3));
-  float a4 = t * 0.040; mat2 rot4 = mat2(cos(a4), -sin(a4), sin(a4), cos(a4));
+  float a1 = t * 0.015 * uSpinSpeed; mat2 rot1 = mat2(cos(a1), -sin(a1), sin(a1), cos(a1));
+  float a2 = t * 0.022 * uSpinSpeed; mat2 rot2 = mat2(cos(a2), -sin(a2), sin(a2), cos(a2));
+  float a3 = t * 0.030 * uSpinSpeed; mat2 rot3 = mat2(cos(a3), -sin(a3), sin(a3), cos(a3));
+  float a4 = t * 0.040 * uSpinSpeed; mat2 rot4 = mat2(cos(a4), -sin(a4), sin(a4), cos(a4));
 
   // Layer 1: fine white dust — FAR (depth 0.3)
   vec2 uv1 = (rot1 * (warpedUV - 0.5)) + 0.5 + cursorOffset * 0.3 * uParallaxDepth;
@@ -702,7 +703,7 @@ void main() {
 
   // ── Background star field with gravitational lensing ──
   // Stars are lensed by gravity sources → Einstein ring effect near catalysts
-  float aStar = t * 0.007; mat2 rotStar = mat2(cos(aStar), -sin(aStar), sin(aStar), cos(aStar));
+  float aStar = t * 0.007 * uSpinSpeed; mat2 rotStar = mat2(cos(aStar), -sin(aStar), sin(aStar), cos(aStar));
   vec2 starUV = vUv + lenzDisplacement * 3.0; // amplify lensing for visible distortion
   vec2 spunStarUV = (rotStar * (starUV - 0.5)) + 0.5;
   

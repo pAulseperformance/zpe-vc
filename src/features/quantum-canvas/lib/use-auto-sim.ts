@@ -44,6 +44,18 @@ export function useAutoSim(callbacks: AutoSimCallbacks) {
     
     if (!simActive) return
     if (!simClicksOn && !simMouseOn) return
+
+    // Randomize gravity initial conditions each time mode enters gravity
+    if (simMode === 'gravity') {
+      const angle = Math.random() * Math.PI * 2
+      const r = 0.15 + Math.random() * 0.15
+      gravStateRef.current = {
+        clickPos: { x: 0.5 + Math.cos(angle) * r, y: 0.5 + Math.sin(angle) * r },
+        clickVel: { x: -Math.sin(angle) * 0.8, y: Math.cos(angle) * 0.8 },
+        mousePos: { x: 0.5 - Math.cos(angle) * r, y: 0.5 - Math.sin(angle) * r },
+        mouseVel: { x: Math.sin(angle) * 0.8, y: -Math.cos(angle) * 0.8 },
+      }
+    }
     
     let lastTime = 0
     let elapsedClick = 0
@@ -153,5 +165,6 @@ export function useAutoSim(callbacks: AutoSimCallbacks) {
     simSeparation, setSimSeparation,
     simMouseSpeed, setSimMouseSpeed,
     simMouseRadius, setSimMouseRadius,
+    gravState: gravStateRef,
   }
 }

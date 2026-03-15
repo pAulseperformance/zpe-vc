@@ -39,6 +39,7 @@ export interface ShaderTuning {
   pointerHover?: boolean
   godMode?: boolean
   hoverWarp: number
+  spinSpeed: number    // Parallax vortex rotation speed multiplier
 }
 
 export const DEFAULT_TUNING: ShaderTuning = {
@@ -77,6 +78,7 @@ export const DEFAULT_TUNING: ShaderTuning = {
   // UI State
   pointerHover: true,
   hoverWarp: 0.1,
+  spinSpeed: 1.0,
 }
 
 export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
@@ -214,6 +216,7 @@ export const OBJECT_SLIDERS: SliderDef[] = [
 
 export const UNIVERSE_SLIDERS: SliderDef[] = [
   { key: 'parallaxDepth', label: 'Parallax', min: 0.0, max: 0.15, step: 0.005 },
+  { key: 'spinSpeed', label: 'Spin Speed', min: 0.0, max: 5.0, step: 0.1 },
   { key: 'iridescence', label: 'Iridescence', min: 0.0, max: 1.0, step: 0.05 },
   { key: 'starField', label: 'Star Field', min: 0.0, max: 1.0, step: 0.05 },
 ]
