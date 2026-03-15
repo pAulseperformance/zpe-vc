@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { QuantumCanvas } from '@/features/quantum-canvas'
 import { DevPanel, usePersistedTuning } from '@/features/quantum-canvas/ui/DevPanel'
 import { TerminalIntake } from '@/widgets/terminal-intake'
+import { DevModeButton } from '@/widgets/dev-mode-button/DevModeButton'
 import { useQuantumAudio } from '@/features/quantum-canvas/lib/use-quantum-audio'
 
 const IS_DEV = import.meta.env.DEV
@@ -19,6 +20,10 @@ export default function App() {
   const simMousePosRef = useRef({ x: 0.5, y: 0.5 })
   const [audioEnabled, setAudioEnabled] = useState(false)
   const audio = useQuantumAudio()
+
+  // Dev mode — unlocked after rip boot sequence OR always in dev
+  const [devUnlocked, setDevUnlocked] = useState(IS_DEV)
+  const [showDevPanel, setShowDevPanel] = useState(IS_DEV)
 
   // Start/stop audio based on toggle
   useEffect(() => {
@@ -55,6 +60,10 @@ export default function App() {
     audio.update(energy, tuning.ripThreshold, interferenceRatio)
   }, [audio, tuning.ripThreshold])
 
+  const handleBootDone = useCallback(() => {
+    setDevUnlocked(true)
+  }, [])
+
   return (
     <div className="relative h-screen w-screen bg-black overflow-hidden">
       <motion.div
@@ -75,11 +84,18 @@ export default function App() {
       </motion.div>
 
       <AnimatePresence>
-        {isForging && <TerminalIntake />}
+        {isForging && <TerminalIntake onBootDone={handleBootDone} />}
       </AnimatePresence>
 
-      {/* Dev panel — only in development */}
-      {IS_DEV && !isForging && (
+      {/* Dev Mode button — appears after terminal boot finishes */}
+      <AnimatePresence>
+        {devUnlocked && !showDevPanel && (
+          <DevModeButton onClick={() => setShowDevPanel(true)} />
+        )}
+      </AnimatePresence>
+
+      {/* Dev panel — unlocked after rip or always in dev */}
+      {showDevPanel && (
         <DevPanel
           tuning={tuning}
           energy={energyDisplay}
@@ -99,3 +115,4 @@ export default function App() {
     </div>
   )
 }
+

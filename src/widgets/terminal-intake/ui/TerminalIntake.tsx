@@ -64,7 +64,7 @@ function BootLine({ text, speed, start, onDone }: BootLineProps) {
 }
 
 /* ─── Terminal Intake ─── */
-export function TerminalIntake() {
+export function TerminalIntake({ onBootDone }: { onBootDone?: () => void }) {
   const [activeLine, setActiveLine] = useState(0)
   const [bootDone, setBootDone] = useState(false)
   const [showInput, setShowInput] = useState(false)
@@ -80,6 +80,7 @@ export function TerminalIntake() {
       setTimeout(() => {
         setBootDone(true)
         setShowInput(true)
+        onBootDone?.()
       }, INPUT_REVEAL_DELAY_MS)
     }
   }
