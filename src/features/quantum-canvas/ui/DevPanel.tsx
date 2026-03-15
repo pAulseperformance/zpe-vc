@@ -73,7 +73,11 @@ interface DevPanelProps {
     active: boolean
     loading: boolean
     toggle: () => void
-    handState: { x: number; y: number; z: number; pinching: boolean; confidence: number; detected: boolean }
+    handState: { x: number; y: number; z: number; pinching: boolean; confidence: number; detected: boolean; gesture?: string }
+    dualState: {
+      left: { detected: boolean; gesture?: string; pinching: boolean; confidence: number }
+      right: { detected: boolean; gesture?: string; pinching: boolean; confidence: number }
+    }
     setMapping: (axis: 'x' | 'y' | 'z', target: HandTarget) => void
     setSmoothing: (v: number) => void
     setPinchThreshold: (v: number) => void
@@ -269,9 +273,11 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           return (
             <div className="mt-2 space-y-1.5">
               {/* Live status */}
-              <div className="flex items-center gap-2 text-[0.5rem] text-cold-white-dim/40">
-                <span>Confidence: <span className={hs.detected ? 'text-green-400' : 'text-red-400'}>{(hs.confidence * 100).toFixed(0)}%</span></span>
-                <span>{hs.pinching ? '🤏 Pinching' : '✋ Open'}</span>
+              <div className="flex items-center gap-2 text-[0.5rem] text-cold-white-dim/40 flex-wrap">
+                <span>L: <span className={handTracking.dualState.left.detected ? 'text-green-400' : 'text-red-400/40'}>{handTracking.dualState.left.detected ? handTracking.dualState.left.gesture ?? '✋' : '—'}</span></span>
+                <span>R: <span className={handTracking.dualState.right.detected ? 'text-cyan-400' : 'text-red-400/40'}>{handTracking.dualState.right.detected ? handTracking.dualState.right.gesture ?? '✋' : '—'}</span></span>
+                <span>{hs.pinching ? '🤏' : ''}</span>
+                <span className="text-cold-white-dim/20">{(hs.confidence * 100).toFixed(0)}%</span>
               </div>
 
               {/* Axis mapping selectors */}

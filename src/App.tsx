@@ -28,8 +28,10 @@ export default function App() {
 
   // Hand tracking
   const hand = useHandTracker()
-  const handNoteRef = useRef<{ release: () => void } | null>(null)
+  const handNoteRef = useRef<{ release: () => void; bend: (f: number) => void } | null>(null)
   const wasPinchingRef = useRef(false)
+  const prevGestureRef = useRef<string>('neutral')
+  const gestureResetRef = useRef<{ distortion?: number; reverbMix?: number } | null>(null)
 
   // Synth controls
   const [synthWaveform, setSynthWaveform] = useState<SynthWaveform>('sine')
@@ -151,47 +153,76 @@ export default function App() {
       setEnergyDisplay(energy)
     }
     // Update synth per frame — use hand mappings if active, else mouse
-    const handS = hand.stateRef.current
-    const useHand = hand.active && handS.detected
+    const dual = hand.dualRef.current
+    const leftH = dual.left
+    const rightH = dual.right
+    const useHand = hand.active && (leftH.detected || rightH.detected)
     let synthX = mouseX
     let synthY = mouseY
     if (useHand) {
-      // Route hand axes through configurable mappings
-      // Fallback to 0.5 (neutral center) — NOT mouseX/mouseY, because
-      // the canvas already overrides mouseRef with hand position
+      // Left hand = primary cursor: pitch + filter (configurable)
+      const primary = leftH.detected ? leftH : rightH
       const filterVal = hand.getTargetValue('filter')
       const pitchVal = hand.getTargetValue('pitch')
-      const volumeVal = hand.getTargetValue('volume')
-      const delayVal = hand.getTargetValue('delayMix')
-      const reverbVal = hand.getTargetValue('reverbMix')
-
       synthX = filterVal ?? 0.5
       synthY = pitchVal ?? 0.5
 
-      // Apply volume/FX targets from hand axes
-      if (volumeVal !== null) audio.setDroneVolume(volumeVal)
-      if (delayVal !== null) audio.setDelayMix(delayVal)
-      if (reverbVal !== null) audio.setReverbMix(reverbVal)
+      // Right hand = FX: volume, delay, reverb (configurable)
+      if (rightH.detected) {
+        const volumeVal = hand.getTargetValueForHand('volume', 'right')
+        const delayVal = hand.getTargetValueForHand('delayMix', 'right')
+        const reverbVal = hand.getTargetValueForHand('reverbMix', 'right')
+        if (volumeVal !== null) audio.setDroneVolume(volumeVal)
+        if (delayVal !== null) audio.setDelayMix(delayVal)
+        if (reverbVal !== null) audio.setReverbMix(reverbVal)
+      }
+
+      // Gesture effects (from either hand)
+      const gesture = primary.gesture
+      if (gesture !== prevGestureRef.current) {
+        // Restore previous gesture's params
+        if (gestureResetRef.current) {
+          if (gestureResetRef.current.distortion !== undefined)
+            audio.setDistortion(gestureResetRef.current.distortion)
+          if (gestureResetRef.current.reverbMix !== undefined)
+            audio.setReverbMix(gestureResetRef.current.reverbMix)
+          gestureResetRef.current = null
+        }
+        // Apply new gesture
+        if (gesture === 'fist') {
+          gestureResetRef.current = { distortion }
+          audio.setDistortion(Math.min(1, distortion + 0.6))
+        } else if (gesture === 'spread') {
+          gestureResetRef.current = { reverbMix }
+          audio.setReverbMix(Math.min(1, reverbMix + 0.5))
+        } else if (gesture === 'open') {
+          gestureResetRef.current = {}
+          audio.setDroneVolume(0)
+        }
+        prevGestureRef.current = gesture
+      }
     }
     audio.update(energy, tuning.ripThreshold, interferenceRatio, synthX, synthY)
 
-    // Hand pinch → note trigger (sustained while pinching)
+    // Hand pinch → note trigger + pitch bend (either hand)
     if (useHand && audioEnabled) {
+      const primary = leftH.detected ? leftH : rightH
       const pitchVal = hand.getTargetValue('pitch')
-      const notePitch = pitchVal ?? handS.y
-      if (handS.pinching && !wasPinchingRef.current) {
-        // Pinch start → play sustained note
+      const notePitch = pitchVal ?? primary.y
+      if (primary.pinching && !wasPinchingRef.current) {
         handNoteRef.current?.release()
         const freq = yToFreq(notePitch, synthScale)
         handNoteRef.current = audio.playNote(freq, 0.8, true)
-        // Spawn visual wave at hand position
-        simClickQueueRef.current.push({ x: handS.x, y: handS.y })
-      } else if (!handS.pinching && wasPinchingRef.current) {
-        // Pinch end → release note
+        simClickQueueRef.current.push({ x: primary.x, y: primary.y })
+      } else if (!primary.pinching && wasPinchingRef.current) {
         handNoteRef.current?.release()
         handNoteRef.current = null
+      } else if (primary.pinching && handNoteRef.current) {
+        // Pitch bend: while pinching, smoothly glide frequency with hand Y
+        const freq = yToFreq(notePitch, synthScale)
+        handNoteRef.current.bend(freq)
       }
-      wasPinchingRef.current = handS.pinching
+      wasPinchingRef.current = primary.pinching
     }
 
     // FFT → Wave Spawning: bass hits auto-spawn waves

@@ -1,2 +1,3 @@
-export { useHandTracker, DEFAULT_HAND_MAPPING } from './ui/useHandTracker'
-export type { HandState, HandMappingConfig, HandTarget } from './ui/useHandTracker'
+export { useHandTracker } from './ui/useHandTracker'
+export { DEFAULT_HAND_MAPPING } from './lib/gesture-map'
+export type { HandState, DualHandState, HandMappingConfig, HandTarget, Gesture } from './ui/useHandTracker'

@@ -1,8 +1,7 @@
 /**
  * hand-tracker.ts — MediaPipe HandLandmarker wrapper.
  *
- * Initializes the WASM model, opens the webcam, and runs
- * detection in a requestAnimationFrame loop.
+ * Supports 2-hand detection with handedness classification.
  */
 import { HandLandmarker, FilesetResolver } from '@mediapipe/tasks-vision'
 
@@ -10,7 +9,12 @@ const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/hand_landmark
 
 export type HandLandmarks = Array<{ x: number; y: number; z: number }>
 
-export type OnFrameCallback = (landmarks: HandLandmarks | null) => void
+export interface FrameResult {
+  left: HandLandmarks | null
+  right: HandLandmarks | null
+}
+
+export type OnFrameCallback = (result: FrameResult) => void
 
 export class HandTracker {
   private landmarker: HandLandmarker | null = null
@@ -33,7 +37,7 @@ export class HandTracker {
     this.landmarker = await HandLandmarker.createFromOptions(vision, {
       baseOptions: { modelAssetPath: MODEL_URL, delegate: 'GPU' },
       runningMode: 'VIDEO',
-      numHands: 1,
+      numHands: 2,
       minHandDetectionConfidence: 0.5,
       minHandPresenceConfidence: 0.5,
       minTrackingConfidence: 0.5,
@@ -85,7 +89,6 @@ export class HandTracker {
     if (!this.video || !this.landmarker) return
 
     const now = performance.now()
-    // Skip if timestamp hasn't changed (same frame)
     if (now === this.lastTime) {
       this.rafId = requestAnimationFrame(this.detect)
       return
@@ -93,9 +96,23 @@ export class HandTracker {
     this.lastTime = now
 
     const result = this.landmarker.detectForVideo(this.video, now)
-    const landmarks = result.landmarks?.[0] ?? null
-    this.onFrame(landmarks as HandLandmarks | null)
 
+    // Sort landmarks by handedness
+    // MediaPipe handedness is from camera's perspective, mirror it
+    const frame: FrameResult = { left: null, right: null }
+    if (result.landmarks && result.handedness) {
+      for (let i = 0; i < result.landmarks.length; i++) {
+        const label = result.handedness[i]?.[0]?.categoryName
+        // Mirror: MediaPipe "Left" (camera POV) = user's right hand
+        if (label === 'Left') {
+          frame.right = result.landmarks[i] as HandLandmarks
+        } else {
+          frame.left = result.landmarks[i] as HandLandmarks
+        }
+      }
+    }
+
+    this.onFrame(frame)
     this.rafId = requestAnimationFrame(this.detect)
   }
 

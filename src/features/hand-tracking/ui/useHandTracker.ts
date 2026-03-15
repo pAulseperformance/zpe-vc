@@ -1,30 +1,26 @@
 /**
- * useHandTracker — React hook for camera hand tracking.
+ * useHandTracker — React hook for dual-hand camera tracking.
  *
- * Manages HandTracker lifecycle and GestureMapper output.
- * Returns hand state + toggle + video ref.
+ * Manages HandTracker lifecycle, dual GestureMapper output,
+ * and provides camera preview element.
  */
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { HandTracker } from '../lib/hand-tracker'
-import { GestureMapper, DEFAULT_HAND_MAPPING } from '../lib/gesture-map'
-import type { HandState, HandMappingConfig, HandTarget } from '../lib/gesture-map'
-
-const EMPTY: HandState = {
-  x: 0.5, y: 0.5, z: 0.5,
-  pinching: false, confidence: 0, detected: false,
-}
+import { GestureMapper, EMPTY_STATE, EMPTY_DUAL } from '../lib/gesture-map'
+import type { HandState, DualHandState, HandMappingConfig, HandTarget, Gesture } from '../lib/gesture-map'
 
 export function useHandTracker() {
   const trackerRef = useRef<HandTracker | null>(null)
   const mapperRef = useRef(new GestureMapper())
   const videoRef = useRef<HTMLVideoElement | null>(null)
-  const stateRef = useRef<HandState>(EMPTY)
+  const stateRef = useRef<HandState>(EMPTY_STATE)
+  const dualRef = useRef<DualHandState>(EMPTY_DUAL)
 
   const [active, setActive] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [handState, setHandState] = useState<HandState>(EMPTY)
+  const [handState, setHandState] = useState<HandState>(EMPTY_STATE)
+  const [dualState, setDualState] = useState<DualHandState>(EMPTY_DUAL)
 
-  // Create video element on first use
   const getVideo = useCallback((): HTMLVideoElement => {
     if (!videoRef.current) {
       const v = document.createElement('video')
@@ -39,19 +35,19 @@ export function useHandTracker() {
 
   const toggle = useCallback(async () => {
     if (active) {
-      // Stop
       trackerRef.current?.stop()
       if (videoRef.current) {
         videoRef.current.remove()
         videoRef.current = null
       }
-      stateRef.current = EMPTY
-      setHandState(EMPTY)
+      stateRef.current = EMPTY_STATE
+      dualRef.current = EMPTY_DUAL
+      setHandState(EMPTY_STATE)
+      setDualState(EMPTY_DUAL)
       setActive(false)
       return
     }
 
-    // Start
     setLoading(true)
     try {
       if (!trackerRef.current) {
@@ -59,14 +55,16 @@ export function useHandTracker() {
       }
       const video = getVideo()
 
-      // Throttle React state updates to ~20fps to avoid excessive renders
       let lastUpdate = 0
-      await trackerRef.current.start(video, (landmarks) => {
-        const state = mapperRef.current.process(landmarks)
-        stateRef.current = state
+      await trackerRef.current.start(video, (result) => {
+        const dual = mapperRef.current.processDual(result.left, result.right)
+        dualRef.current = dual
+        stateRef.current = dual.primary
+
         const now = performance.now()
-        if (now - lastUpdate > 50) { // ~20fps UI updates
-          setHandState({ ...state })
+        if (now - lastUpdate > 50) {
+          setHandState({ ...dual.primary })
+          setDualState({ ...dual })
           lastUpdate = now
         }
       })
@@ -102,7 +100,11 @@ export function useHandTracker() {
     return mapperRef.current.getTargetValue(target, stateRef.current)
   }, [])
 
-  // Cleanup on unmount
+  const getTargetValueForHand = useCallback((target: HandTarget, which: 'left' | 'right'): number | null => {
+    const state = which === 'left' ? dualRef.current.left : dualRef.current.right
+    return mapperRef.current.getTargetValue(target, state)
+  }, [])
+
   useEffect(() => {
     return () => {
       trackerRef.current?.destroy()
@@ -116,10 +118,10 @@ export function useHandTracker() {
   return {
     active, loading, toggle,
     handState, stateRef,
+    dualState, dualRef,
     setMapping, setSmoothing, setPinchThreshold,
-    getConfig, getTargetValue,
+    getConfig, getTargetValue, getTargetValueForHand,
   }
 }
 
-export { DEFAULT_HAND_MAPPING }
-export type { HandState, HandMappingConfig, HandTarget }
+export type { HandState, DualHandState, HandMappingConfig, HandTarget, Gesture }

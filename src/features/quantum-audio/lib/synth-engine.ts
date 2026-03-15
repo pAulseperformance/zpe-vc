@@ -273,8 +273,8 @@ export class SynthEngine {
    * Play a note. If sustained=true, holds at sustain level until release() is called.
    * If sustained=false (default), auto-releases after attack+decay.
    */
-  playNote(freq: number, velocity = 0.8, sustained = false): { release: () => void } {
-    const noop = { release: () => {} }
+  playNote(freq: number, velocity = 0.8, sustained = false): { release: () => void; bend: (f: number) => void } {
+    const noop = { release: () => {}, bend: () => {} }
     const n = this.nodes
     if (!n || !this._active) return noop
 
@@ -326,6 +326,12 @@ export class SynthEngine {
       oscs.forEach(o => { try { o.stop(t + release + 0.05) } catch { /* already stopped */ } })
     }
 
+    const doBend = (f: number) => {
+      if (released) return
+      const t = ctx.currentTime
+      oscs.forEach(o => o.frequency.setTargetAtTime(f, t, 0.06))
+    }
+
     if (!sustained) {
       // Auto-release after attack + decay + small hold
       const autoReleaseTime = now + attack + decay + 0.05
@@ -334,7 +340,7 @@ export class SynthEngine {
       oscs.forEach(o => { try { o.stop(autoReleaseTime + release + 0.05) } catch { /* */ } })
     }
 
-    return { release: doRelease }
+    return { release: doRelease, bend: doBend }
   }
 
   // ── Internal: Voice Management ─────────────────────────
