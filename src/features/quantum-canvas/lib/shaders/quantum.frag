@@ -335,8 +335,14 @@ void main() {
   color += theForge(uv, t) * s3;
   color += theAwakening(uv, t) * s4;
 
-  // Ensure deep blacks
-  color = max(color, VOID * 0.5);
+  // Heavy radial vignette — edges forced to pure #000000
+  float vignetteDist = length(vUv - 0.5) * 1.4;
+  float vignette = 1.0 - pow(vignetteDist, 1.8);
+  vignette = clamp(vignette, 0.0, 1.0);
+  color *= vignette;
+
+  // Ensure deep blacks at edges
+  color = max(color, vec3(0.0));
 
   gl_FragColor = vec4(color, 1.0);
 }

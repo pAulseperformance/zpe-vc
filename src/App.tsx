@@ -14,7 +14,7 @@ export default function App() {
   return (
     <div
       ref={scrollRef}
-      className="h-screen overflow-y-auto overflow-x-hidden bg-void"
+      className="h-screen overflow-y-auto overflow-x-hidden bg-black"
     >
       {/* Fixed full-screen R3F canvas — behind everything */}
       <div className="fixed inset-0 z-0">
@@ -26,8 +26,8 @@ export default function App() {
         className="relative z-10"
         style={{ height: `${SCROLL_PAGES * 100}vh` }}
       >
-        {/* STATE 1: Quantum Jitter (0%) */}
-        <HeroSection />
+        {/* STATE 1: Quantum Jitter (0%) — stealth load */}
+        <HeroSection scrollRef={scrollRef} />
 
         {/* STATE 2: Transverse Waves (33%) */}
         <WavesSection scrollRef={scrollRef} />

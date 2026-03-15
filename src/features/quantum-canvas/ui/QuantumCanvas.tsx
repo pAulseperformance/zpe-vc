@@ -1,5 +1,6 @@
 import { useRef, useMemo } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { type MotionValue, useMotionValueEvent } from 'framer-motion'
 import * as THREE from 'three'
 
@@ -53,6 +54,7 @@ function ShaderPlane({ progress }: ShaderPlaneProps) {
         uniforms={uniforms}
         depthWrite={false}
         depthTest={false}
+        toneMapped={false}
       />
     </mesh>
   )
@@ -70,9 +72,17 @@ export function QuantumCanvas({ progress }: QuantumCanvasProps) {
       gl={{ antialias: false, alpha: false, powerPreference: 'high-performance' }}
       camera={{ position: [0, 0, 1] }}
       dpr={[1, 1.5]}
-      style={{ background: '#050507' }}
+      style={{ background: '#000000' }}
     >
       <ShaderPlane progress={progress} />
+      <EffectComposer>
+        <Bloom
+          intensity={1.2}
+          luminanceThreshold={0.15}
+          luminanceSmoothing={0.9}
+          mipmapBlur
+        />
+      </EffectComposer>
     </Canvas>
   )
 }
