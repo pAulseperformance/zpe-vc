@@ -77,9 +77,9 @@ export class GestureMapper {
     const indexTip = landmarks[8]   // Index finger tip
     const thumbTip = landmarks[4]   // Thumb tip
 
-    // Raw position from index finger tip (mirror X so moving hand right = right on screen)
+    // Raw position from index finger tip (mirror X, invert Y for canvas UV)
     const rawX = 1 - indexTip.x
-    const rawY = indexTip.y
+    const rawY = 1 - indexTip.y
     // Z: MediaPipe z is relative depth, scale and clamp to 0-1
     const rawZ = Math.max(0, Math.min(1, 0.5 - indexTip.z * 5))
 
