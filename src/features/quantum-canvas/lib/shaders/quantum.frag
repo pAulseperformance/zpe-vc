@@ -314,6 +314,8 @@ void main() {
     vec2 cat = uCatalysts[i];
     cat.x *= aspect;
     cat.x -= (aspect - 1.0) * 0.5;
+    // Scale catalyst to match zoomed UV space
+    cat = (cat - vec2(0.5 * aspect, 0.5)) * uViewScale + vec2(0.5 * aspect, 0.5);
 
     // ── PERF: Damping cull — wave amplitude < 0.03%, skip entirely ──
     float emDamping = exp(-age * uEmDamping);
