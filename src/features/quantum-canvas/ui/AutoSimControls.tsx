@@ -57,10 +57,10 @@ export function AutoSimControls({ sim }: AutoSimControlsProps) {
             <div className="flex items-center gap-2">
               <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Mode</span>
               <button
-                onClick={() => setSimMode(simMode === 'single' ? 'dual' : 'single')}
+                onClick={() => setSimMode(simMode === 'single' ? 'dual' : simMode === 'dual' ? 'gravity' : 'single')}
                 className="text-[0.55rem] text-cold-white-dim/50 hover:text-electric-purple border border-cold-white-dim/10 rounded px-2 py-0.5"
               >
-                {simMode === 'single' ? '● Single Origin' : '●● Dual Origins'}
+                {simMode === 'single' ? '● Single Origin' : simMode === 'dual' ? '●● Dual Origins' : '🌀 Gravity Orbit'}
               </button>
             </div>
             <div className="flex items-center gap-2">

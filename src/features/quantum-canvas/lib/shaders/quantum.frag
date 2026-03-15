@@ -40,6 +40,8 @@ uniform float uIridescence;
 uniform float uPaletteMode; // 0 = physical, 1 = artistic, 2 = hybrid
 uniform float uStarField;   // 0 = off, 1 = full brightness
 uniform float uWavelength;  // 0=radio, 1=infrared, 2=visible, 3=xray, 4=gamma
+uniform float uPointerHover;
+uniform float uHoverWarp;
 
 // ─── Barrier / Diffraction Uniforms ───
 uniform float uBarrierEnabled;  // 0=off, 1=on
@@ -273,11 +275,9 @@ void main() {
 
   // ── LOCALIZED HOVER ──
   float mouseDist = distance(uv, mouse);
-  float hoverInfluence = smoothstep(uHoverRadius, 0.0, mouseDist);
-
-  float speedMult = 1.0 + eNorm * 8.0 * hoverInfluence;
-  float brightMult = 1.0 + eNorm * 4.0 * hoverInfluence;
-  float localWarp = eNorm * 0.08 * hoverInfluence;
+  float hoverInfluence = smoothstep(uHoverRadius, 0.0, mouseDist) * uPointerHover;
+  float speedMult = 1.0 + uHoverWarp * 15.0 * hoverInfluence;
+  float localWarp = uHoverWarp * 0.2 * hoverInfluence;
 
   vec2 hoverWarpOffset = vec2(
     snoise(uv * 15.0 + t * speedMult * 0.3),
@@ -526,8 +526,15 @@ void main() {
   // Per-layer depth parallax: shifts UV based on cursor offset × depth
   vec2 cursorOffset = uv - mouse;
 
+  // ── Infinite Parallax Spin Matrices ──
+  // Deeper layers rotate slower, creating a 3D vortex
+  float a1 = t * 0.015; mat2 rot1 = mat2(cos(a1), -sin(a1), sin(a1), cos(a1));
+  float a2 = t * 0.022; mat2 rot2 = mat2(cos(a2), -sin(a2), sin(a2), cos(a2));
+  float a3 = t * 0.030; mat2 rot3 = mat2(cos(a3), -sin(a3), sin(a3), cos(a3));
+  float a4 = t * 0.040; mat2 rot4 = mat2(cos(a4), -sin(a4), sin(a4), cos(a4));
+
   // Layer 1: fine white dust — FAR (depth 0.3)
-  vec2 uv1 = warpedUV + cursorOffset * 0.3 * uParallaxDepth;
+  vec2 uv1 = (rot1 * (warpedUV - 0.5)) + 0.5 + cursorOffset * 0.3 * uParallaxDepth;
   float speed1 = speedMult * 0.65;
   float dust1 = snoise(uv1 * 350.0 + t * speed1 * 0.5);
   float sparks1 = smoothstep(0.78, 0.85, dust1) * 0.07 * brightMult;
@@ -561,7 +568,7 @@ void main() {
   color += dust1Color * sparks1;
 
   // Layer 2: violet dust — MID (depth 0.5)
-  vec2 uv2 = warpedUV + cursorOffset * 0.5 * uParallaxDepth;
+  vec2 uv2 = (rot2 * (warpedUV - 0.5)) + 0.5 + cursorOffset * 0.5 * uParallaxDepth;
   float speed2 = speedMult * 0.8;
   float dust2 = snoise(uv2 * 500.0 + t * speed2 * 0.7 + 100.0);
   float sparks2 = smoothstep(0.82, 0.88, dust2) * 0.035 * brightMult;
@@ -576,7 +583,7 @@ void main() {
   color += dust2Color * sparks2;
 
   // Layer 3: dense field — NEAR-MID (depth 0.7)
-  vec2 uv3 = warpedUV + cursorOffset * 0.7 * uParallaxDepth;
+  vec2 uv3 = (rot3 * (warpedUV - 0.5)) + 0.5 + cursorOffset * 0.7 * uParallaxDepth;
   float speed3 = speedMult * 0.9;
   float dust3 = snoise(uv3 * 600.0 - t * speed3 * 0.3 + 50.0);
   float sparks3 = smoothstep(0.84, 0.90, dust3) * 0.025 * brightMult;
@@ -591,7 +598,7 @@ void main() {
   color += dust3Color * sparks3;
 
   // Layer 4: bright pops — NEAR (depth 1.0)
-  vec2 uv4 = warpedUV + cursorOffset * 1.0 * uParallaxDepth;
+  vec2 uv4 = (rot4 * (warpedUV - 0.5)) + 0.5 + cursorOffset * 1.0 * uParallaxDepth;
   float speed4 = speedMult;
   float popThreshold = mix(0.90, 0.75, localHeat);
   float pop = snoise(uv4 * 250.0 + t * speed4 * 2.2);
@@ -694,10 +701,13 @@ void main() {
 
   // ── Background star field with gravitational lensing ──
   // Stars are lensed by gravity sources → Einstein ring effect near catalysts
+  float aStar = t * 0.007; mat2 rotStar = mat2(cos(aStar), -sin(aStar), sin(aStar), cos(aStar));
   vec2 starUV = vUv + lenzDisplacement * 3.0; // amplify lensing for visible distortion
+  vec2 spunStarUV = (rotStar * (starUV - 0.5)) + 0.5;
+  
   float starGrid = 80.0; // star density (lower = bigger cells = more visible)
-  vec2 starCell = floor(starUV * starGrid);
-  vec2 starFrac = fract(starUV * starGrid);
+  vec2 starCell = floor(spunStarUV * starGrid);
+  vec2 starFrac = fract(spunStarUV * starGrid);
   // Pseudo-random hash per cell (deterministic star positions)
   float starHash = fract(sin(dot(starCell, vec2(127.1, 311.7))) * 43758.5453);
   float starHash2 = fract(sin(dot(starCell, vec2(269.5, 183.3))) * 76195.6397);

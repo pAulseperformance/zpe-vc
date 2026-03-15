@@ -83,6 +83,8 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
       uSlitWidth: { value: tuning.slitWidth ?? 0.04 },
       uSlitSeparation: { value: tuning.slitSeparation ?? 0.15 },
       uDiffSamples: { value: tuning.diffSamples ?? 12 },
+      uPointerHover: { value: tuning.pointerHover ?? false ? 1.0 : 0.0 },
+      uHoverWarp: { value: tuning.hoverWarp ?? 0.1 },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
@@ -244,6 +246,8 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
     mat.uniforms.uSlitWidth.value = t.slitWidth ?? 0.04
     mat.uniforms.uSlitSeparation.value = t.slitSeparation ?? 0.15
     mat.uniforms.uDiffSamples.value = t.diffSamples ?? 12
+    mat.uniforms.uPointerHover.value = t.pointerHover ?? false ? 1.0 : 0.0
+    mat.uniforms.uHoverWarp.value = t.hoverWarp ?? 0.1
   })
 
   return (

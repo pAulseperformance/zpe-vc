@@ -30,8 +30,8 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
   const [collapsed, setCollapsed] = useState(false)
   const sim = useAutoSim({ onSimClick, onSimMouseActiveChange, onSimMouseUpdate })
 
-  const handleChange = (key: keyof ShaderTuning, value: number) => {
-    onChange({ ...tuning, [key]: value })
+  const handleChange = (key: keyof ShaderTuning, value: number | boolean) => {
+    onChange({ ...tuning, [key]: value } as ShaderTuning)
   }
 
   if (collapsed) {
@@ -76,20 +76,45 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
       <PaletteModeToggle tuning={tuning} onChange={onChange} />
       <WavelengthBandSelector tuning={tuning} onChange={onChange} />
 
+      {/* God Mode & Pointer Hover Toggles */}
+      <div className="flex gap-2 mb-2 w-full">
+        <button 
+          onClick={() => handleChange('godMode', !tuning.godMode)}
+          className={`flex-1 text-[0.6rem] uppercase tracking-wider border px-2 py-1 rounded transition-colors ${tuning.godMode ? 'border-electric-purple bg-electric-purple/20 text-electric-purple shadow-[0_0_10px_rgba(155,81,224,0.3)]' : 'border-cold-white-dim/20 text-cold-white-dim/50 hover:border-cold-white-dim/40'}`}
+        >
+          ⚡ God Mode
+        </button>
+        <button 
+          onClick={() => handleChange('pointerHover', !tuning.pointerHover)}
+          className={`flex-1 text-[0.6rem] uppercase tracking-wider border px-2 py-1 rounded transition-colors ${tuning.pointerHover ? 'border-electric-purple bg-electric-purple/20 text-electric-purple shadow-[0_0_10px_rgba(155,81,224,0.3)]' : 'border-cold-white-dim/20 text-cold-white-dim/50 hover:border-cold-white-dim/40'}`}
+        >
+          🖱 Hover Warp
+        </button>
+      </div>
+
       {/* Sliders */}
       <div className="space-y-1.5 max-h-[40vh] overflow-y-auto pr-1">
         {SLIDERS.map(({ key, label, min, max, step }) => (
           <div key={key} className="flex items-center gap-2">
             <label className="text-[0.55rem] text-cold-white-dim/40 w-20 shrink-0 truncate">{label}</label>
             <input
-              type="range" min={min} max={max} step={step}
-              value={tuning[key]}
+              type="range" min={min} max={tuning.godMode ? max * 50 : max} step={step}
+              value={tuning[key] as number}
               onChange={(e) => handleChange(key, parseFloat(e.target.value))}
               className="flex-1 h-1 accent-electric-purple"
             />
-            <span className="text-[0.55rem] w-10 text-right tabular-nums">
-              {tuning[key].toFixed(step < 1 ? (step < 0.01 ? 3 : 2) : 0)}
-            </span>
+            {tuning.godMode ? (
+              <input 
+                type="number" 
+                value={tuning[key] as number} 
+                onChange={(e) => handleChange(key, parseFloat(e.target.value) || 0)}
+                className="text-[0.55rem] w-12 text-right tabular-nums bg-transparent border-b border-electric-purple/50 text-electric-purple outline-none appearance-none"
+              />
+            ) : (
+              <span className="text-[0.55rem] w-10 text-right tabular-nums">
+                {(tuning[key] as number).toFixed(step < 1 ? (step < 0.01 ? 3 : 2) : 0)}
+              </span>
+            )}
           </div>
         ))}
       </div>

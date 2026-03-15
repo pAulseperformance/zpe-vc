@@ -32,10 +32,13 @@ export interface ShaderTuning {
   // Preset Metadata (not sent to shader)
   autoSim?: {
     active: boolean
-    mode: 'single' | 'dual'
+    mode: 'single' | 'dual' | 'gravity'
     rate: number
   }
   ripBlocked?: boolean
+  pointerHover?: boolean
+  godMode?: boolean
+  hoverWarp: number
 }
 
 export const DEFAULT_TUNING: ShaderTuning = {
@@ -55,19 +58,25 @@ export const DEFAULT_TUNING: ShaderTuning = {
   ripThreshold: 200,
   parallaxDepth: 0,
   heatDecay: 0.2,
-  heatAttack: 0.65,
-  heatIntensity: 0.3,
-  interferenceBlend: 0,
-  iridescence: 0.6,
-  paletteMode: 0,   // Default: physical
-  starField: 0,
-  wavelength: 2,     // Visible light
-  barrierEnabled: 0,
-  barrierY: 0.27,
-  slitCount: 3,
-  slitWidth: 0.04,
-  slitSeparation: 0.15,
-  diffSamples: 12,
+  heatAttack: 0.00,
+  heatIntensity: 0.3,     // Warm but not blown out
+  interferenceBlend: 0.1, // Subtle diffraction focus
+  iridescence: 1.0,       // Max physical spectrum blending
+  paletteMode: 0,         // Physical blackbody
+  starField: 0.0,
+  wavelength: 2,          // Visible spectrum
+  
+  // Diffraction Basics
+  barrierEnabled: 0.0,
+  barrierY: 0.5,
+  slitCount: 2.0,
+  slitWidth: 0.05,
+  slitSeparation: 0.20,
+  diffSamples: 8.0,
+
+  // UI State
+  pointerHover: true,
+  hoverWarp: 0.1,
 }
 
 export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
@@ -135,11 +144,43 @@ export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
       rate: 10,
     },
     ripBlocked: true,
+  },
+  'Pulsar': {
+    ...DEFAULT_TUNING,
+    paletteMode: 0, // Physical
+    wavelength: 3,  // X-Ray (Diamond)
+    waveSpeed: 0.10, // Slow creeping phase
+    waveFreq: 10,
+    waveWidth: 0.005,
+    emDamping: 0.10,
+    gravDamping: 0.05,
+    waveLifetime: 1.00,
+    maxWaves: 5,
+    lenzStrength: 0.020,
+    lenzWake: 0.00,
+    hoverRadius: 0.05,
+    energyDecay: 2,
+    velocityMult: 5,
+    clickSpike: 5,
+    ripThreshold: 30,
+    parallaxDepth: 0.020,
+    heatDecay: 0.05,
+    heatAttack: 0.00,
+    heatIntensity: 0.35,
+    interferenceBlend: 0.20,
+    iridescence: 0.00,
+    starField: 1.00,
+    autoSim: {
+      active: true,
+      mode: 'single',
+      rate: 10,
+    },
+    ripBlocked: true,
   }
 }
 
 export interface SliderDef {
-  key: keyof Omit<ShaderTuning, 'autoSim' | 'ripBlocked'>
+  key: keyof Omit<ShaderTuning, 'autoSim' | 'ripBlocked' | 'pointerHover' | 'godMode'>
   label: string
   min: number
   max: number
@@ -157,6 +198,7 @@ export const SLIDERS: SliderDef[] = [
   { key: 'lenzStrength', label: 'Lenz Strength', min: 0.0, max: 0.5, step: 0.005 },
   { key: 'lenzWake', label: 'Lenz Wake', min: 0.0, max: 0.6, step: 0.01 },
   { key: 'hoverRadius', label: 'Hover Radius', min: 0.05, max: 0.6, step: 0.05 },
+  { key: 'hoverWarp', label: 'Hover Warp', min: 0.0, max: 1.0, step: 0.05 },
   { key: 'energyDecay', label: 'Energy Decay/s', min: 2, max: 30, step: 1 },
   { key: 'velocityMult', label: 'Velocity Mult', min: 5, max: 60, step: 5 },
   { key: 'clickSpike', label: 'Click Spike', min: 5, max: 50, step: 5 },
