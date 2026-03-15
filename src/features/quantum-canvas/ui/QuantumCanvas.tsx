@@ -6,12 +6,20 @@ import * as THREE from 'three'
 import vertexShader from '../lib/shaders/quantum.vert'
 import fragmentShader from '../lib/shaders/quantum.frag'
 
-/* ─── Interaction State Refs (shared) ─── */
+/* ─── Callback types ─── */
 
 export interface SandboxCallbacks {
   onFirstHover: () => void
-  onFirstRelease: () => void
+  onRip: () => void
 }
+
+/* ─── Constants ─── */
+const ENERGY_DECAY_RATE = 8.0       // Energy lost per second (idle decay)
+const VELOCITY_ENERGY_MULT = 40.0   // Energy gained per unit of mouse velocity
+const CLICK_ENERGY_SPIKE = 25.0     // Energy added per click
+const RIP_THRESHOLD = 100.0         // Energy level that triggers the Rip
+
+/* ─── Shader Plane ─── */
 
 interface ShaderPlaneProps {
   callbacks: SandboxCallbacks
@@ -21,41 +29,33 @@ function ShaderPlane({ callbacks }: ShaderPlaneProps) {
   const meshRef = useRef<THREE.Mesh>(null)
   const { size } = useThree()
 
-  // Interaction refs — no React re-renders, just refs for useFrame
+  // Interaction state — all refs, zero re-renders
   const mouseRef = useRef(new THREE.Vector2(0.5, 0.5))
-  const hoverRef = useRef(0)     // 0→1 smooth
-  const releaseAnimRef = useRef(0)
-  const releaseOriginRef = useRef(new THREE.Vector2(0.5, 0.5))
-  const isPressedRef = useRef(false)
-  const releaseActiveRef = useRef(false)
+  const prevMouseRef = useRef(new THREE.Vector2(0.5, 0.5))
+  const energyRef = useRef(0)
   const hasHoveredRef = useRef(false)
-  const hasReleasedRef = useRef(false)
+  const hasRippedRef = useRef(false)
+  const ripFlashRef = useRef(0)
 
   const uniforms = useMemo(
     () => ({
       uTime: { value: 0 },
       uResolution: { value: new THREE.Vector2(size.width, size.height) },
       uMouse: { value: new THREE.Vector2(0.5, 0.5) },
-      uHoverStrength: { value: 0 },
-      uPressStrength: { value: 0 },
-      uReleaseAnim: { value: 0 },
-      uReleaseOrigin: { value: new THREE.Vector2(0.5, 0.5) },
+      uEnergy: { value: 0 },
+      uRipFlash: { value: 0 },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   )
 
-  // Pointer handlers
+  // ── Pointer handlers ──
   const onPointerMove = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
-      // Convert R3F coordinates to 0..1 UV space
-      const { uv } = e
-      if (uv) {
-        mouseRef.current.set(uv.x, uv.y)
+      if (e.uv) {
+        prevMouseRef.current.copy(mouseRef.current)
+        mouseRef.current.set(e.uv.x, e.uv.y)
       }
-      hoverRef.current = 1.0
-
-      // Fire first-hover callback once
       if (!hasHoveredRef.current) {
         hasHoveredRef.current = true
         callbacks.onFirstHover()
@@ -65,65 +65,48 @@ function ShaderPlane({ callbacks }: ShaderPlaneProps) {
   )
 
   const onPointerDown = useCallback(() => {
-    isPressedRef.current = true
-    releaseActiveRef.current = false
-    releaseAnimRef.current = 0
+    // Massive energy spike on click
+    energyRef.current += CLICK_ENERGY_SPIKE
   }, [])
-
-  const onPointerUp = useCallback(() => {
-    if (isPressedRef.current) {
-      isPressedRef.current = false
-      releaseActiveRef.current = true
-      releaseAnimRef.current = 0
-      releaseOriginRef.current.copy(mouseRef.current)
-
-      // Fire first-release callback once
-      if (!hasReleasedRef.current) {
-        hasReleasedRef.current = true
-        callbacks.onFirstRelease()
-      }
-    }
-  }, [callbacks])
 
   const onPointerLeave = useCallback(() => {
-    hoverRef.current = 0
-    if (isPressedRef.current) {
-      isPressedRef.current = false
-    }
+    prevMouseRef.current.copy(mouseRef.current)
   }, [])
 
+  // ── Frame loop ──
   useFrame((state, delta) => {
     const mat = meshRef.current?.material as THREE.ShaderMaterial | undefined
     if (!mat) return
 
-    // Smooth interpolation of interaction states
-    const lerpSpeed = 4.0 * delta
+    // Calculate mouse velocity (distance moved this frame)
+    const velocity = mouseRef.current.distanceTo(prevMouseRef.current)
+    prevMouseRef.current.copy(mouseRef.current)
 
-    // Hover strength — smoothly ramp up/down
-    const targetHover = hoverRef.current
-    mat.uniforms.uHoverStrength.value += (targetHover - mat.uniforms.uHoverStrength.value) * lerpSpeed * 2
+    // Add velocity-based energy
+    energyRef.current += velocity * VELOCITY_ENERGY_MULT
 
-    // Press strength — smoothly ramp up/down
-    const targetPress = isPressedRef.current ? 1.0 : 0.0
-    mat.uniforms.uPressStrength.value += (targetPress - mat.uniforms.uPressStrength.value) * lerpSpeed * 3
+    // Constant decay toward 0
+    energyRef.current -= ENERGY_DECAY_RATE * delta
+    energyRef.current = Math.max(0, energyRef.current)
 
-    // Release animation — drives from 0→1 over ~1.5 seconds
-    if (releaseActiveRef.current) {
-      releaseAnimRef.current += delta * 0.7
-      if (releaseAnimRef.current >= 1.0) {
-        releaseAnimRef.current = 1.0
-        releaseActiveRef.current = false
-      }
-    } else if (releaseAnimRef.current > 0 && !releaseActiveRef.current) {
-      // Fade out after animation completes
-      releaseAnimRef.current -= delta * 0.5
-      if (releaseAnimRef.current < 0) releaseAnimRef.current = 0
+    // Check Rip threshold
+    if (energyRef.current >= RIP_THRESHOLD && !hasRippedRef.current) {
+      hasRippedRef.current = true
+      ripFlashRef.current = 1.0
+      callbacks.onRip()
     }
 
+    // Decay rip flash
+    if (ripFlashRef.current > 0) {
+      ripFlashRef.current -= delta * 2.0 // Fast decay ~0.5s
+      if (ripFlashRef.current < 0) ripFlashRef.current = 0
+    }
+
+    // Push uniforms
     mat.uniforms.uTime.value = state.clock.elapsedTime
     mat.uniforms.uMouse.value.copy(mouseRef.current)
-    mat.uniforms.uReleaseAnim.value = releaseAnimRef.current
-    mat.uniforms.uReleaseOrigin.value.copy(releaseOriginRef.current)
+    mat.uniforms.uEnergy.value = energyRef.current
+    mat.uniforms.uRipFlash.value = ripFlashRef.current
     mat.uniforms.uResolution.value.set(
       state.size.width * state.viewport.dpr,
       state.size.height * state.viewport.dpr
@@ -135,7 +118,6 @@ function ShaderPlane({ callbacks }: ShaderPlaneProps) {
       ref={meshRef}
       onPointerMove={onPointerMove}
       onPointerDown={onPointerDown}
-      onPointerUp={onPointerUp}
       onPointerLeave={onPointerLeave}
     >
       <planeGeometry args={[2, 2]} />
@@ -151,7 +133,7 @@ function ShaderPlane({ callbacks }: ShaderPlaneProps) {
   )
 }
 
-/* ─── Public Canvas Wrapper ─── */
+/* ─── Public Canvas ─── */
 
 interface QuantumCanvasProps {
   callbacks: SandboxCallbacks
@@ -164,7 +146,6 @@ export function QuantumCanvas({ callbacks }: QuantumCanvasProps) {
       camera={{ position: [0, 0, 1] }}
       dpr={[1, 1.5]}
       style={{ background: '#000000', cursor: 'crosshair' }}
-      eventSource={undefined}
     >
       <ShaderPlane callbacks={callbacks} />
       <EffectComposer>

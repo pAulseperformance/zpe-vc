@@ -51,4 +51,10 @@
   --color-cold-white-dim: rgba(224, 231, 255, 0.6);
   --color-cold-white-ghost: rgba(224, 231, 255, 0.08);
   --font-family-primary: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  --animate-blink: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
