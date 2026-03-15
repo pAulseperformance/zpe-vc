@@ -64,14 +64,27 @@ vec3 energySpectrum(float intensity) {
   return a + b * cos(6.28318 * (c * i + d));
 }
 
-// Blackbody cooling spectrum: white-hot → teal → gold → amber → violet
-vec3 coolingSpectrum(float heat) {
+// Heat trail spectrum: physically accurate cooling radiation
+// Fresh heat (1.0) = white-hot → cools through yellow → orange → red → dark ember → black
+// Follows Wien's displacement law: peak wavelength increases as temperature drops
+vec3 heatTrailSpectrum(float heat) {
   float h = clamp(heat, 0.0, 1.0);
-  vec3 a = vec3(0.5, 0.4, 0.35);
-  vec3 b = vec3(0.5, 0.45, 0.4);
-  vec3 c = vec3(1.0, 0.8, 0.6);
-  vec3 d = vec3(0.0, 0.05, 0.20);
-  return a + b * cos(6.28318 * (c * h + d));
+  vec3 col;
+  // Black/invisible (h < 0.1) — below visible threshold (infrared)
+  col = vec3(0.0);
+  // Dark ember (0.1 - 0.25) — just entering visible range (~800K)
+  col = mix(col, vec3(0.25, 0.01, 0.0), smoothstep(0.05, 0.2, h));
+  // Cherry red (0.25 - 0.4) — ~1500K
+  col = mix(col, vec3(0.6, 0.04, 0.0), smoothstep(0.2, 0.4, h));
+  // Orange (0.4 - 0.55) — ~2500K
+  col = mix(col, vec3(0.9, 0.3, 0.02), smoothstep(0.35, 0.55, h));
+  // Yellow-orange (0.55 - 0.7) — ~3500K
+  col = mix(col, vec3(1.0, 0.65, 0.1), smoothstep(0.5, 0.7, h));
+  // Yellow-white (0.7 - 0.85) — ~5000K
+  col = mix(col, vec3(1.0, 0.9, 0.6), smoothstep(0.65, 0.85, h));
+  // White-hot (0.85 - 1.0) — ~8000K+ (peak energy)
+  col = mix(col, vec3(1.0, 0.97, 0.95), smoothstep(0.8, 1.0, h));
+  return col;
 }
 
 // Planck blackbody approximation: physically accurate thermal emission
@@ -368,9 +381,9 @@ void main() {
     dust1Color = mix(COLD_WHT * 0.5, planckBlackbody(localHeat * 0.8), localHeat);
     heatColor = planckBlackbody(heatTint);
   } else if (uPaletteMode < 1.5) {
-    // Artistic: current vibrant palette
+    // Artistic: physically-based heat trail spectrum
     dust1Color = mix(COLD_WHT, energySpectrum(localHeat * 0.8), localHeat);
-    heatColor = coolingSpectrum(heatTint);
+    heatColor = heatTrailSpectrum(heatTint);
   } else {
     // Hybrid: blackbody thermal + artistic wavefronts
     dust1Color = mix(COLD_WHT * 0.7, planckBlackbody(localHeat * 0.9), localHeat);
