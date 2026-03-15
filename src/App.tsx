@@ -95,7 +95,7 @@ export default function App() {
             simMousePos={simMousePosRef}
             gravBodyPositions={gravBodyPositionsRef}
             onZoomChange={handleZoomChange}
-            onManualClick={(x, y) => audio.triggerClick(x)}
+            onManualClick={(x, _y) => audio.triggerClick(x)}
           />
         </Suspense>
       </motion.div>

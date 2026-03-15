@@ -195,7 +195,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
     )
 
     // Report energy + interference to parent
-    onEnergyChange(effectiveEnergy, interferenceRatio)
+    onEnergyChange(effectiveEnergy, interferenceRatio, mouseRef.current.x)
 
     if (energyRef.current >= t.ripThreshold && !hasRippedRef.current) {
       hasRippedRef.current = true
