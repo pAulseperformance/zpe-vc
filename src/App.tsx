@@ -14,7 +14,7 @@ export default function App() {
   const [energyDisplay, setEnergyDisplay] = useState(0)
   const [energyOverride, setEnergyOverride] = useState<number | null>(null)
   const simClickQueueRef = useRef<Array<{x: number, y: number}>>([])
-  const [wallRip, setWallRip] = useState(true)
+  const [wallRip, setWallRip] = useState(false)
   const [simMouseActive, setSimMouseActive] = useState(false)
   const simMousePosRef = useRef({ x: 0.5, y: 0.5 })
   const [audioEnabled, setAudioEnabled] = useState(false)
