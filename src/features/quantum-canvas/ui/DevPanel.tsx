@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import type { MutableRefObject } from 'react'
 import { useAutoSim } from '../lib/use-auto-sim'
 import { MOUSE_SLIDERS, OBJECT_SLIDERS, UNIVERSE_SLIDERS, DEFAULT_TUNING } from '../lib/shader-tuning'
 import type { ShaderTuning } from '../lib/shader-tuning'
@@ -27,11 +28,30 @@ interface DevPanelProps {
   onAudioToggle: (value: boolean) => void
   hideCursor: boolean
   onCursorHideChange: (value: boolean) => void
+  gravBodyPositions: MutableRefObject<{click: {x: number, y: number}, mouse: {x: number, y: number}} | null>
 }
 
-export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, hideCursor, onCursorHideChange }: DevPanelProps) {
+export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, hideCursor, onCursorHideChange, gravBodyPositions }: DevPanelProps) {
   const [collapsed, setCollapsed] = useState(false)
   const sim = useAutoSim({ onSimClick, onSimMouseActiveChange, onSimMouseUpdate })
+
+  // Bridge gravity body positions to parent for adaptive zoom
+  useEffect(() => {
+    if (sim.simMode === 'gravity' && sim.simActive) {
+      const interval = setInterval(() => {
+        gravBodyPositions.current = {
+          click: { ...sim.gravState.current.clickPos },
+          mouse: { ...sim.gravState.current.mousePos },
+        }
+      }, 16) // ~60fps sync
+      return () => {
+        clearInterval(interval)
+        gravBodyPositions.current = null
+      }
+    } else {
+      gravBodyPositions.current = null
+    }
+  }, [sim.simMode, sim.simActive, sim.gravState, gravBodyPositions])
 
   const handleChange = (key: keyof ShaderTuning, value: number | boolean) => {
     onChange({ ...tuning, [key]: value } as ShaderTuning)
@@ -49,7 +69,7 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
   }
 
   return (
-    <div className="fixed top-3 right-3 z-50 w-72 bg-black/90 border border-electric-purple/30 rounded-lg p-3 font-mono text-xs text-cold-white-dim backdrop-blur-sm">
+    <div className="fixed top-3 right-3 z-50 w-72 max-h-[85vh] flex flex-col bg-black/90 border border-electric-purple/30 rounded-lg p-3 font-mono text-xs text-cold-white-dim backdrop-blur-sm">
       <PanelHeader
         audioEnabled={audioEnabled}
         onAudioToggle={onAudioToggle}
@@ -95,8 +115,8 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
         </button>
       </div>
 
-      {/* Grouped Sliders */}
-      <div className="space-y-1.5 max-h-[40vh] overflow-y-auto pr-1">
+      {/* Scrollable body */}
+      <div className="flex-1 overflow-y-auto pr-1 space-y-1.5">
         {/* Mouse / God Object */}
         <div className="text-[0.55rem] text-electric-purple/50 uppercase tracking-widest mt-1 mb-0.5 border-b border-electric-purple/10 pb-0.5">🖱 Mouse (God Object)</div>
         <button 
@@ -114,7 +134,20 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
         {/* Universe */}
         <div className="text-[0.55rem] text-electric-purple/50 uppercase tracking-widest mt-2 mb-0.5 border-b border-electric-purple/10 pb-0.5">🌌 Universe</div>
         <SliderGroup sliders={UNIVERSE_SLIDERS} tuning={tuning} onChange={handleChange} />
-      </div>
+
+        {/* Zoom Mode Toggle */}
+        <div className="flex items-center gap-2 mt-1">
+          <span className="text-[0.55rem] text-cold-white-dim/40 w-14 shrink-0">Zoom</span>
+          <button
+            onClick={() => {
+              const next = ((tuning.zoomMode ?? 0) + 1) % 3
+              onChange({ ...tuning, zoomMode: next })
+            }}
+            className="text-[0.55rem] text-cold-white-dim/50 hover:text-electric-purple border border-cold-white-dim/10 rounded px-2 py-0.5"
+          >
+            {(tuning.zoomMode ?? 0) === 0 ? '🔧 Manual' : (tuning.zoomMode ?? 0) === 1 ? '🔭 Adaptive' : '🔭 Adaptive + Walls'}
+          </button>
+        </div>
 
       <PresetControls
         tuning={{
@@ -158,6 +191,7 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           <span className="text-[0.55rem] text-fuchsia-400">● Click ({sim.gravState.current.clickPos.x.toFixed(2)}, {sim.gravState.current.clickPos.y.toFixed(2)})</span>
         </div>
       )}
+      </div>
     </div>
   )
 }

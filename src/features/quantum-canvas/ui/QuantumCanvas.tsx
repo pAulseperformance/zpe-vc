@@ -29,9 +29,10 @@ interface ShaderPlaneProps {
   simClickQueue: MutableRefObject<Array<{x: number, y: number}>>
   simMouseActive: boolean
   simMousePos: MutableRefObject<{x: number, y: number}>
+  gravBodyPositions: MutableRefObject<{click: {x: number, y: number}, mouse: {x: number, y: number}} | null>
 }
 
-function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos }: ShaderPlaneProps) {
+function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions }: ShaderPlaneProps) {
   const meshRef = useRef<THREE.Mesh>(null)
   const { size } = useThree()
 
@@ -44,6 +45,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
   const catalystsRef = useRef<Catalyst[]>([])
   const tuningRef = useRef(tuning)
   tuningRef.current = tuning
+  const adaptiveZoomRef = useRef(1.0) // Smoothed adaptive zoom value
 
   const uniforms = useMemo(
     () => ({
@@ -86,6 +88,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
       uPointerHover: { value: (tuning.pointerHover ?? false) ? 1.0 : 0.0 },
       uHoverWarp: { value: tuning.hoverWarp ?? 0.1 },
       uSpinSpeed: { value: tuning.spinSpeed ?? 1.0 },
+      uViewScale: { value: tuning.viewScale ?? 1.0 },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
@@ -250,6 +253,38 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
     mat.uniforms.uPointerHover.value = (t.pointerHover ?? false) ? 1.0 : 0.0
     mat.uniforms.uHoverWarp.value = t.hoverWarp ?? 0.1
     mat.uniforms.uSpinSpeed.value = t.spinSpeed ?? 1.0
+    mat.uniforms.uViewScale.value = t.viewScale ?? 1.0
+
+    // ── Adaptive Zoom ──
+    let targetScale = t.viewScale ?? 1.0
+    if ((t.zoomMode ?? 0) >= 1) {
+      // Compute bounding box of all active catalysts + gravity bodies
+      let minX = 0.5, maxX = 0.5, minY = 0.5, maxY = 0.5
+      for (const cat of cats) {
+        minX = Math.min(minX, cat.x)
+        maxX = Math.max(maxX, cat.x)
+        minY = Math.min(minY, cat.y)
+        maxY = Math.max(maxY, cat.y)
+      }
+      // Include gravity body positions if available
+      const grav = gravBodyPositions.current
+      if (grav) {
+        minX = Math.min(minX, grav.click.x, grav.mouse.x)
+        maxX = Math.max(maxX, grav.click.x, grav.mouse.x)
+        minY = Math.min(minY, grav.click.y, grav.mouse.y)
+        maxY = Math.max(maxY, grav.click.y, grav.mouse.y)
+      }
+      // Compute required scale with padding
+      const spanX = maxX - minX
+      const spanY = maxY - minY
+      const maxSpan = Math.max(spanX, spanY)
+      // Scale so the bounding box fits within 60% of the viewport
+      const requiredScale = Math.max(1.0, maxSpan / 0.6)
+      targetScale = Math.max(targetScale, requiredScale)
+    }
+    // Smooth lerp toward target zoom (prevents jarring jumps)
+    adaptiveZoomRef.current += (targetScale - adaptiveZoomRef.current) * Math.min(1.0, delta * 3.0)
+    mat.uniforms.uViewScale.value = adaptiveZoomRef.current
   })
 
   return (
@@ -282,9 +317,10 @@ interface QuantumCanvasProps {
   simClickQueue: MutableRefObject<Array<{x: number, y: number}>>
   simMouseActive: boolean
   simMousePos: MutableRefObject<{x: number, y: number}>
+  gravBodyPositions: MutableRefObject<{click: {x: number, y: number}, mouse: {x: number, y: number}} | null>
 }
 
-export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos }: QuantumCanvasProps) {
+export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions }: QuantumCanvasProps) {
   return (
     <Canvas
       gl={{ antialias: false, alpha: false, powerPreference: 'high-performance' }}
@@ -292,7 +328,7 @@ export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, s
       dpr={[1, 1.5]}
       style={{ background: '#000000', cursor: 'none' }}
     >
-      <ShaderPlane onRip={onRip} tuning={tuning} onEnergyChange={onEnergyChange} energyOverride={energyOverride} simClickQueue={simClickQueue} simMouseActive={simMouseActive} simMousePos={simMousePos} />
+      <ShaderPlane onRip={onRip} tuning={tuning} onEnergyChange={onEnergyChange} energyOverride={energyOverride} simClickQueue={simClickQueue} simMouseActive={simMouseActive} simMousePos={simMousePos} gravBodyPositions={gravBodyPositions} />
       <EffectComposer>
         <Bloom
           intensity={1.5}

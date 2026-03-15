@@ -21,6 +21,7 @@ export default function App() {
   const [audioEnabled, setAudioEnabled] = useState(false)
   const [hideCursor, setHideCursor] = useState(true)
   const audio = useQuantumAudio()
+  const gravBodyPositionsRef = useRef<{click: {x: number, y: number}, mouse: {x: number, y: number}} | null>(null)
 
   // Dev mode — unlocked after rip boot sequence OR always in dev
   const [devUnlocked, setDevUnlocked] = useState(IS_DEV)
@@ -82,6 +83,7 @@ export default function App() {
             simClickQueue={simClickQueueRef}
             simMouseActive={simMouseActive}
             simMousePos={simMousePosRef}
+            gravBodyPositions={gravBodyPositionsRef}
           />
         </Suspense>
       </motion.div>
@@ -118,6 +120,7 @@ export default function App() {
           onAudioToggle={setAudioEnabled}
           hideCursor={hideCursor}
           onCursorHideChange={setHideCursor}
+          gravBodyPositions={gravBodyPositionsRef}
         />
       )}
     </div>

@@ -42,6 +42,8 @@ export interface ShaderTuning {
   godMode?: boolean
   hoverWarp: number
   spinSpeed: number    // Parallax vortex rotation speed multiplier
+  viewScale: number    // Camera zoom: 1.0=default, >1=zoomed out
+  zoomMode: number     // 0=manual, 1=adaptive, 2=adaptive+confinement
 }
 
 export const DEFAULT_TUNING: ShaderTuning = {
@@ -81,6 +83,8 @@ export const DEFAULT_TUNING: ShaderTuning = {
   pointerHover: true,
   hoverWarp: 0.1,
   spinSpeed: 1.0,
+  viewScale: 1.0,
+  zoomMode: 0,
 }
 
 export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
@@ -324,10 +328,46 @@ export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
     },
     ripBlocked: true,
   },
+  'Orbit': {
+    ...DEFAULT_TUNING,
+    paletteMode: 0, // Physical
+    wavelength: 2,
+    waveSpeed: 1.9,
+    waveFreq: 150,
+    waveWidth: 0.1,
+    emDamping: 1.6,
+    gravDamping: 1.6,
+    waveLifetime: 15,
+    maxWaves: 10,
+    lenzStrength: 0.12,
+    lenzWake: 0.6,
+    energyDecay: 30,
+    velocityMult: 30,
+    clickSpike: 20,
+    ripThreshold: 200,
+    parallaxDepth: 0,
+    heatDecay: 0.75,
+    heatAttack: 0,
+    heatIntensity: 0.3,
+    interferenceBlend: 0.15,
+    iridescence: 0.85,
+    starField: 0.5,
+    hoverWarp: 0.6,
+    spinSpeed: 1.9,
+    zoomMode: 1, // Adaptive zoom
+    autoSim: {
+      active: true,
+      mode: 'gravity',
+      rate: 10,
+      clicksOn: true,
+      mouseOn: true,
+    },
+    ripBlocked: true,
+  },
 }
 
 export interface SliderDef {
-  key: keyof Omit<ShaderTuning, 'autoSim' | 'ripBlocked' | 'pointerHover' | 'godMode'>
+  key: keyof Omit<ShaderTuning, 'autoSim' | 'ripBlocked' | 'pointerHover' | 'godMode' | 'zoomMode'>
   label: string
   min: number
   max: number
@@ -364,6 +404,7 @@ export const UNIVERSE_SLIDERS: SliderDef[] = [
   { key: 'spinSpeed', label: 'Spin Speed', min: 0.0, max: 5.0, step: 0.1 },
   { key: 'iridescence', label: 'Iridescence', min: 0.0, max: 1.0, step: 0.05 },
   { key: 'starField', label: 'Star Field', min: 0.0, max: 1.0, step: 0.05 },
+  { key: 'viewScale', label: 'View Scale', min: 0.5, max: 3.0, step: 0.05 },
 ]
 
 /** All sliders combined (backward compat) */

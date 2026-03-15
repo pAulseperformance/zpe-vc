@@ -43,6 +43,7 @@ uniform float uWavelength;  // 0=radio, 1=infrared, 2=visible, 3=xray, 4=gamma
 uniform float uPointerHover;
 uniform float uHoverWarp;
 uniform float uSpinSpeed;
+uniform float uViewScale;  // Camera zoom: 1.0=default, >1=zoomed out
 
 // ─── Barrier / Diffraction Uniforms ───
 uniform float uBarrierEnabled;  // 0=off, 1=on
@@ -264,9 +265,14 @@ void main() {
   uv.x *= aspect;
   uv.x -= (aspect - 1.0) * 0.5;
 
+  // ── Camera zoom: scale UV from center ──
+  uv = (uv - vec2(0.5 * aspect, 0.5)) * uViewScale + vec2(0.5 * aspect, 0.5);
+
   vec2 mouse = uMouse;
   mouse.x *= aspect;
   mouse.x -= (aspect - 1.0) * 0.5;
+  // Scale mouse to match zoomed UV space
+  mouse = (mouse - vec2(0.5 * aspect, 0.5)) * uViewScale + vec2(0.5 * aspect, 0.5);
 
   float t = uTime;
 
