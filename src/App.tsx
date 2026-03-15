@@ -155,7 +155,9 @@ export default function App() {
     const useHand = hand.active && handS.detected
     const synthX = useHand ? handS.x : mouseX
     const synthY = useHand ? handS.y : mouseY
-    audio.update(energy, tuning.ripThreshold, interferenceRatio, synthX, synthY)
+    // When hand tracking, ensure drone is always audible (bypass energy gate)
+    const synthEnergy = useHand ? Math.max(energy, tuning.ripThreshold * 0.6) : energy
+    audio.update(synthEnergy, tuning.ripThreshold, interferenceRatio, synthX, synthY)
 
     // Hand pinch → note trigger (sustained while pinching)
     if (useHand && audioEnabled) {
