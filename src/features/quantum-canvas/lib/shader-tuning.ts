@@ -96,38 +96,33 @@ export const DEFAULT_TUNING: ShaderTuning = {
   ripThreshold: 200,
   parallaxDepth: 0,
   heatDecay: 0.2,
-  heatAttack: 0.00,
-  heatIntensity: 0.3,     // Warm but not blown out
-  interferenceBlend: 0.1, // Subtle diffraction focus
-  iridescence: 1.0,       // Max physical spectrum blending
-  paletteMode: 0,         // Physical blackbody
-  starField: 0.0,
-  wavelength: 2,          // Visible spectrum
-  
-  // Diffraction Basics
-  barrierEnabled: 0.0,
+  heatAttack: 0,
+  heatIntensity: 0.3,
+  interferenceBlend: 0.1,
+  iridescence: 1,
+  paletteMode: 0,
+  starField: 0,
+  wavelength: 2,
+  barrierEnabled: 0,
   barrierY: 0.5,
-  slitCount: 2.0,
+  slitCount: 2,
   slitWidth: 0.05,
-  slitSeparation: 0.20,
-  diffSamples: 8.0,
-
-  // UI State
+  slitSeparation: 0.2,
+  diffSamples: 8,
   pointerHover: true,
   hoverWarp: 0.1,
-  spinSpeed: 1.0,
-  viewScale: 1.0,
+  spinSpeed: 1,
+  viewScale: 1.1840000000000002,
   zoomMode: 0,
-  // Audio defaults
-  audioEnabled: false,
+  audioEnabled: true,
   masterVolume: 0.8,
-  droneVolume: 0.5,
+  droneVolume: 1,
   notesVolume: 0.8,
-  synthWaveform: 'sine',
-  synthFilterQ: 2.0,
+  synthWaveform: "sawtooth",
+  synthFilterQ: 1,
   audioReactive: true,
-  synthScale: 'continuous',
-  unisonCount: 2,
+  synthScale: "minor-pentatonic",
+  unisonCount: 7,
   detuneSpread: 7,
   delayTime: 0.3,
   delayFeedback: 0.4,
@@ -135,7 +130,7 @@ export const DEFAULT_TUNING: ShaderTuning = {
   reverbMix: 0,
   reverbDecay: 2,
   distortion: 0,
-  autoDistortion: false,
+  autoDistortion: true,
   fftSpawnEnabled: false,
   fftSpawnThreshold: 0.5,
   fftSpawnRate: 150,
@@ -143,8 +138,7 @@ export const DEFAULT_TUNING: ShaderTuning = {
   envDecay: 0.085,
   envSustain: 0.6,
   envRelease: 0.25,
-  // UI defaults
-  hideCursor: true,
+  hideCursor: true
 }
 
 export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
