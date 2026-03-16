@@ -30,6 +30,7 @@ export default function App() {
   // Hand tracking
   const hand = useHandTracker()
   const handNoteRef = useRef<{ release: () => void; bend: (f: number) => void } | null>(null)
+  const mouseNoteRef = useRef<{ release: () => void; bend: (f: number) => void } | null>(null)
   const rightNoteRef = useRef<{ release: () => void; bend: (f: number) => void } | null>(null)
   const wasPinchingRef = useRef(false)
   const wasRightPinchingRef = useRef(false)
@@ -381,8 +382,14 @@ export default function App() {
             gravBodyPositions={gravBodyPositionsRef}
             onZoomChange={handleZoomChange}
             onManualClick={(_x, y) => {
+              // Release any previous held mouse note
+              mouseNoteRef.current?.release()
               const freq = yToFreq(y, synthScale)
-              audio.playNote(freq, 0.6)
+              mouseNoteRef.current = audio.playNote(freq, 0.6, true) // sustained=true
+            }}
+            onManualRelease={() => {
+              mouseNoteRef.current?.release()
+              mouseNoteRef.current = null
             }}
             onCanvasReady={(c) => { canvasRef.current = c }}
             audioBands={audioReactive ? audio.fftRef : undefined}

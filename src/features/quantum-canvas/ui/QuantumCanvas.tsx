@@ -32,12 +32,13 @@ interface ShaderPlaneProps {
   gravBodyPositions: MutableRefObject<{click: {x: number, y: number}, mouse: {x: number, y: number}} | null>
   onZoomChange: (delta: number) => void
   onManualClick?: (x: number, y: number) => void
+  onManualRelease?: () => void
   audioBands?: MutableRefObject<{bass: number, mid: number, treble: number}>
   handTrackingActive?: boolean
   handTrackingPos?: MutableRefObject<{x: number, y: number, detected: boolean}>
 }
 
-function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick, audioBands, handTrackingActive, handTrackingPos }: ShaderPlaneProps) {
+function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick, onManualRelease, audioBands, handTrackingActive, handTrackingPos }: ShaderPlaneProps) {
   const meshRef = useRef<THREE.Mesh>(null)
   const { size } = useThree()
 
@@ -128,9 +129,17 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
     [onManualClick]
   )
 
+  const onPointerUp = useCallback(
+    () => {
+      onManualRelease?.()
+    },
+    [onManualRelease]
+  )
+
   const onPointerLeave = useCallback(() => {
     prevMouseRef.current.copy(mouseRef.current)
-  }, [])
+    onManualRelease?.()
+  }, [onManualRelease])
 
   const onWheel = useCallback(
     (e: ThreeEvent<WheelEvent>) => {
@@ -327,6 +336,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
       ref={meshRef}
       onPointerMove={onPointerMove}
       onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
       onPointerLeave={onPointerLeave}
       onWheel={onWheel}
     >
@@ -356,13 +366,14 @@ interface QuantumCanvasProps {
   gravBodyPositions: MutableRefObject<{click: {x: number, y: number}, mouse: {x: number, y: number}} | null>
   onZoomChange: (delta: number) => void
   onManualClick?: (x: number, y: number) => void
+  onManualRelease?: () => void
   onCanvasReady?: (canvas: HTMLCanvasElement) => void
   audioBands?: MutableRefObject<{bass: number, mid: number, treble: number}>
   handTrackingActive?: boolean
   handTrackingPos?: MutableRefObject<{x: number, y: number, detected: boolean}>
 }
 
-export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick, onCanvasReady, audioBands, handTrackingActive, handTrackingPos }: QuantumCanvasProps) {
+export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick, onManualRelease, onCanvasReady, audioBands, handTrackingActive, handTrackingPos }: QuantumCanvasProps) {
   return (
     <Canvas
       gl={{ antialias: false, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: true }}
@@ -371,7 +382,7 @@ export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, s
       style={{ background: '#000000', cursor: 'none' }}
       onCreated={({ gl }) => onCanvasReady?.(gl.domElement)}
     >
-      <ShaderPlane onRip={onRip} tuning={tuning} onEnergyChange={onEnergyChange} energyOverride={energyOverride} simClickQueue={simClickQueue} simMouseActive={simMouseActive} simMousePos={simMousePos} gravBodyPositions={gravBodyPositions} onZoomChange={onZoomChange} onManualClick={onManualClick} audioBands={audioBands} handTrackingActive={handTrackingActive} handTrackingPos={handTrackingPos} />
+      <ShaderPlane onRip={onRip} tuning={tuning} onEnergyChange={onEnergyChange} energyOverride={energyOverride} simClickQueue={simClickQueue} simMouseActive={simMouseActive} simMousePos={simMousePos} gravBodyPositions={gravBodyPositions} onZoomChange={onZoomChange} onManualClick={onManualClick} onManualRelease={onManualRelease} audioBands={audioBands} handTrackingActive={handTrackingActive} handTrackingPos={handTrackingPos} />
       <EffectComposer>
         <Bloom
           intensity={1.5}
