@@ -13,16 +13,16 @@ import { SynthControls } from './SynthControls'
 import { FXControls } from './FXControls'
 import { EnvelopeControls } from './EnvelopeControls'
 import { SliderGroup } from './SliderGroup'
-import type { SynthWaveform, FFTBands, ScaleName } from '@/features/quantum-audio'
+import type { FFTBands } from '@/features/quantum-audio'
+import { useTuningStore } from '../model/tuning-store'
+import { useAudioStore } from '@/features/quantum-audio/model/audio-store'
+import { useUIStore } from '@/shared/model/ui-store'
 
 export type { ShaderTuning }
 export { DEFAULT_TUNING } from '../lib/shader-tuning'
-export { usePersistedTuning } from '../lib/use-shader-presets'
 
 interface DevPanelProps {
-  tuning: ShaderTuning
   energy: number
-  onChange: (tuning: ShaderTuning) => void
   energyOverride: number | null
   onEnergyOverride: (value: number | null) => void
   onSimClick: (x: number, y: number) => void
@@ -31,45 +31,14 @@ interface DevPanelProps {
   simMouseActive: boolean
   onSimMouseActiveChange: (value: boolean) => void
   onSimMouseUpdate: (x: number, y: number) => void
-  audioEnabled: boolean; onAudioToggle: (v: boolean) => void
-  masterVolume: number; onMasterVolume: (v: number) => void
-  droneVolume: number; onDroneVolume: (v: number) => void
-  notesVolume: number; onNotesVolume: (v: number) => void
-  hideCursor: boolean
-  onCursorHideChange: (value: boolean) => void
   gravBodyPositions: MutableRefObject<{click: {x: number, y: number}, mouse: {x: number, y: number}} | null>
   canvasRef: MutableRefObject<HTMLCanvasElement | null>
-  // Synth controls
-  synthWaveform: SynthWaveform; onSynthWaveform: (wf: SynthWaveform) => void
-  synthFilterQ: number
-  onSynthFilterQ: (q: number) => void
-  audioReactive: boolean
-  onAudioReactive: (v: boolean) => void
-  synthScale: ScaleName
-  onSynthScale: (s: ScaleName) => void
-  unisonCount: number
-  onUnisonCount: (n: number) => void
-  detuneSpread: number
-  onDetuneSpread: (c: number) => void
-  // FX controls
-  delayTime: number; onDelayTime: (v: number) => void
-  delayFeedback: number; onDelayFeedback: (v: number) => void
-  delayMix: number; onDelayMix: (v: number) => void
-  reverbMix: number; onReverbMix: (v: number) => void
-  reverbDecay: number; onReverbDecay: (v: number) => void
-  distortion: number; onDistortion: (v: number) => void
-  autoDistortion: boolean; onAutoDistortion: (v: boolean) => void
-  // Feedback loop
-  fftSpawnEnabled: boolean; onFftSpawnEnabled: (v: boolean) => void
-  fftSpawnThreshold: number; onFftSpawnThreshold: (v: number) => void
-  fftSpawnRate: number; onFftSpawnRate: (v: number) => void
-  // Envelope
-  envAttack: number; onEnvAttack: (v: number) => void
-  envDecay: number; onEnvDecay: (v: number) => void
-  envSustain: number; onEnvSustain: (v: number) => void
-  envRelease: number; onEnvRelease: (v: number) => void
   fftRef: MutableRefObject<FFTBands>
-  // Hand tracking
+  audio: {
+    playNote: (freq: number, vel: number, sustained?: boolean) => { release: () => void; bend: (f: number) => void }
+    getRecordingStream: () => MediaStream | null
+  }
+  // Hand tracking (still prop-drilled from App — deeply ref-coupled)
   handTracking: {
     active: boolean
     loading: boolean
@@ -104,7 +73,64 @@ interface DevPanelProps {
   }
 }
 
-export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, audioEnabled, onAudioToggle, masterVolume, onMasterVolume, droneVolume, onDroneVolume, notesVolume, onNotesVolume, hideCursor, onCursorHideChange, gravBodyPositions, canvasRef, synthWaveform, onSynthWaveform, synthFilterQ, onSynthFilterQ, audioReactive, onAudioReactive, synthScale, onSynthScale, unisonCount, onUnisonCount, detuneSpread, onDetuneSpread, delayTime, onDelayTime, delayFeedback, onDelayFeedback, delayMix, onDelayMix, reverbMix, onReverbMix, reverbDecay, onReverbDecay, distortion, onDistortion, autoDistortion, onAutoDistortion, fftSpawnEnabled, onFftSpawnEnabled, fftSpawnThreshold, onFftSpawnThreshold, fftSpawnRate, onFftSpawnRate, envAttack, onEnvAttack, envDecay, onEnvDecay, envSustain, onEnvSustain, envRelease, onEnvRelease, fftRef, handTracking, performance }: DevPanelProps) {
+export function DevPanel({ energy, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, gravBodyPositions, canvasRef, fftRef, audio: _audio, handTracking, performance }: DevPanelProps) {
+  // ── Read from stores ──
+  const tuning = useTuningStore((s) => s.tuning)
+  const setTuning = useTuningStore((s) => s.setTuning)
+
+  const audioEnabled = useAudioStore((s) => s.audioEnabled)
+  const setAudioEnabled = useAudioStore((s) => s.setAudioEnabled)
+  const masterVolume = useAudioStore((s) => s.masterVolume)
+  const setMasterVolume = useAudioStore((s) => s.setMasterVolume)
+  const droneVolume = useAudioStore((s) => s.droneVolume)
+  const setDroneVolume = useAudioStore((s) => s.setDroneVolume)
+  const notesVolume = useAudioStore((s) => s.notesVolume)
+  const setNotesVolume = useAudioStore((s) => s.setNotesVolume)
+  const synthWaveform = useAudioStore((s) => s.synthWaveform)
+  const setSynthWaveform = useAudioStore((s) => s.setSynthWaveform)
+  const synthFilterQ = useAudioStore((s) => s.synthFilterQ)
+  const setSynthFilterQ = useAudioStore((s) => s.setSynthFilterQ)
+  const audioReactive = useAudioStore((s) => s.audioReactive)
+  const setAudioReactive = useAudioStore((s) => s.setAudioReactive)
+  const synthScale = useAudioStore((s) => s.synthScale)
+  const setSynthScale = useAudioStore((s) => s.setSynthScale)
+  const unisonCount = useAudioStore((s) => s.unisonCount)
+  const setUnisonCount = useAudioStore((s) => s.setUnisonCount)
+  const detuneSpread = useAudioStore((s) => s.detuneSpread)
+  const setDetuneSpread = useAudioStore((s) => s.setDetuneSpread)
+  const delayTime = useAudioStore((s) => s.delayTime)
+  const setDelayTime = useAudioStore((s) => s.setDelayTime)
+  const delayFeedback = useAudioStore((s) => s.delayFeedback)
+  const setDelayFeedback = useAudioStore((s) => s.setDelayFeedback)
+  const delayMix = useAudioStore((s) => s.delayMix)
+  const setDelayMix = useAudioStore((s) => s.setDelayMix)
+  const reverbMix = useAudioStore((s) => s.reverbMix)
+  const setReverbMix = useAudioStore((s) => s.setReverbMix)
+  const reverbDecay = useAudioStore((s) => s.reverbDecay)
+  const setReverbDecay = useAudioStore((s) => s.setReverbDecay)
+  const distortion = useAudioStore((s) => s.distortion)
+  const setDistortion = useAudioStore((s) => s.setDistortion)
+  const autoDistortion = useAudioStore((s) => s.autoDistortion)
+  const setAutoDistortion = useAudioStore((s) => s.setAutoDistortion)
+  const fftSpawnEnabled = useAudioStore((s) => s.fftSpawnEnabled)
+  const setFftSpawnEnabled = useAudioStore((s) => s.setFftSpawnEnabled)
+  const fftSpawnThreshold = useAudioStore((s) => s.fftSpawnThreshold)
+  const setFftSpawnThreshold = useAudioStore((s) => s.setFftSpawnThreshold)
+  const fftSpawnRate = useAudioStore((s) => s.fftSpawnRate)
+  const setFftSpawnRate = useAudioStore((s) => s.setFftSpawnRate)
+  const envAttack = useAudioStore((s) => s.envAttack)
+  const setEnvAttack = useAudioStore((s) => s.setEnvAttack)
+  const envDecay = useAudioStore((s) => s.envDecay)
+  const setEnvDecay = useAudioStore((s) => s.setEnvDecay)
+  const envSustain = useAudioStore((s) => s.envSustain)
+  const setEnvSustain = useAudioStore((s) => s.setEnvSustain)
+  const envRelease = useAudioStore((s) => s.envRelease)
+  const setEnvRelease = useAudioStore((s) => s.setEnvRelease)
+  const hydrateFromTuning = useAudioStore((s) => s.hydrateFromTuning)
+
+  const hideCursor = useUIStore((s) => s.hideCursor)
+  const setHideCursor = useUIStore((s) => s.setHideCursor)
+
   const [collapsed, setCollapsed] = useState(false)
   const sim = useAutoSim({ onSimClick, onSimMouseActiveChange, onSimMouseUpdate, zoomMode: tuning.zoomMode })
 
@@ -116,7 +142,7 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           click: { ...sim.gravState.current.clickPos },
           mouse: { ...sim.gravState.current.mousePos },
         }
-      }, 16) // ~60fps sync
+      }, 16)
       return () => {
         clearInterval(interval)
         gravBodyPositions.current = null
@@ -127,7 +153,7 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
   }, [sim.simMode, sim.simActive, sim.gravState, gravBodyPositions])
 
   const handleChange = (key: keyof ShaderTuning, value: number | boolean) => {
-    onChange({ ...tuning, [key]: value } as ShaderTuning)
+    setTuning({ ...tuning, [key]: value } as ShaderTuning)
   }
 
   if (collapsed) {
@@ -147,27 +173,37 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
       <div className="flex-shrink-0 p-3 pb-0">
       <PanelHeader
         audioEnabled={audioEnabled}
-        onAudioToggle={onAudioToggle}
+        onAudioToggle={setAudioEnabled}
         onCopy={(btn) => {
           const og = btn.innerText
-          // Full snapshot: shader tuning + all synth/FX state
+          // Full snapshot: shader tuning + all synth/FX state from stores
+          const audioState = useAudioStore.getState()
           const fullState = {
             ...tuning,
-            audioEnabled,
-            masterVolume,
-            droneVolume,
-            notesVolume,
-            synthWaveform,
-            synthFilterQ,
-            audioReactive,
-            synthScale,
-            unisonCount,
-            detuneSpread,
-            delayTime, delayFeedback, delayMix,
-            reverbMix, reverbDecay,
-            distortion, autoDistortion,
-            fftSpawnEnabled, fftSpawnThreshold, fftSpawnRate,
-            envAttack, envDecay, envSustain, envRelease,
+            audioEnabled: audioState.audioEnabled,
+            masterVolume: audioState.masterVolume,
+            droneVolume: audioState.droneVolume,
+            notesVolume: audioState.notesVolume,
+            synthWaveform: audioState.synthWaveform,
+            synthFilterQ: audioState.synthFilterQ,
+            audioReactive: audioState.audioReactive,
+            synthScale: audioState.synthScale,
+            unisonCount: audioState.unisonCount,
+            detuneSpread: audioState.detuneSpread,
+            delayTime: audioState.delayTime,
+            delayFeedback: audioState.delayFeedback,
+            delayMix: audioState.delayMix,
+            reverbMix: audioState.reverbMix,
+            reverbDecay: audioState.reverbDecay,
+            distortion: audioState.distortion,
+            autoDistortion: audioState.autoDistortion,
+            fftSpawnEnabled: audioState.fftSpawnEnabled,
+            fftSpawnThreshold: audioState.fftSpawnThreshold,
+            fftSpawnRate: audioState.fftSpawnRate,
+            envAttack: audioState.envAttack,
+            envDecay: audioState.envDecay,
+            envSustain: audioState.envSustain,
+            envRelease: audioState.envRelease,
             hideCursor,
           }
           navigator.clipboard.writeText(JSON.stringify(fullState, null, 2))
@@ -178,7 +214,10 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
             btn.classList.remove('text-electric-purple')
           }, 1000)
         }}
-        onReset={() => onChange({ ...DEFAULT_TUNING })}
+        onReset={() => {
+          setTuning({ ...DEFAULT_TUNING })
+          hydrateFromTuning(DEFAULT_TUNING)
+        }}
         onCollapse={() => setCollapsed(true)}
       />
       </div>
@@ -190,33 +229,33 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
         <>
         <SynthControls
           waveform={synthWaveform}
-          onWaveformChange={onSynthWaveform}
+          onWaveformChange={setSynthWaveform}
           filterQ={synthFilterQ}
-          onFilterQChange={onSynthFilterQ}
+          onFilterQChange={setSynthFilterQ}
           audioReactive={audioReactive}
-          onAudioReactiveChange={onAudioReactive}
+          onAudioReactiveChange={setAudioReactive}
           scale={synthScale}
-          onScaleChange={onSynthScale}
+          onScaleChange={setSynthScale}
           unisonCount={unisonCount}
-          onUnisonCountChange={onUnisonCount}
+          onUnisonCountChange={setUnisonCount}
           detuneSpread={detuneSpread}
-          onDetuneSpreadChange={onDetuneSpread}
+          onDetuneSpreadChange={setDetuneSpread}
           volume={masterVolume}
-          onVolumeChange={onMasterVolume}
+          onVolumeChange={setMasterVolume}
           droneVolume={droneVolume}
-          onDroneVolumeChange={onDroneVolume}
+          onDroneVolumeChange={setDroneVolume}
           notesVolume={notesVolume}
-          onNotesVolumeChange={onNotesVolume}
+          onNotesVolumeChange={setNotesVolume}
           fftRef={fftRef}
         />
         <FXControls
-          delayTime={delayTime} onDelayTimeChange={onDelayTime}
-          delayFeedback={delayFeedback} onDelayFeedbackChange={onDelayFeedback}
-          delayMix={delayMix} onDelayMixChange={onDelayMix}
-          reverbMix={reverbMix} onReverbMixChange={onReverbMix}
-          reverbDecay={reverbDecay} onReverbDecayChange={onReverbDecay}
-          distortion={distortion} onDistortionChange={onDistortion}
-          autoDistortion={autoDistortion} onAutoDistortionChange={onAutoDistortion}
+          delayTime={delayTime} onDelayTimeChange={setDelayTime}
+          delayFeedback={delayFeedback} onDelayFeedbackChange={setDelayFeedback}
+          delayMix={delayMix} onDelayMixChange={setDelayMix}
+          reverbMix={reverbMix} onReverbMixChange={setReverbMix}
+          reverbDecay={reverbDecay} onReverbDecayChange={setReverbDecay}
+          distortion={distortion} onDistortionChange={setDistortion}
+          autoDistortion={autoDistortion} onAutoDistortionChange={setAutoDistortion}
         />
         {/* Feedback Loop */}
         <div className="mt-3 pt-3 border-t border-cold-white-dim/10">
@@ -224,7 +263,7 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           <div className="flex items-center gap-2 mt-1.5">
             <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Bass→Wave</span>
             <button
-              onClick={() => onFftSpawnEnabled(!fftSpawnEnabled)}
+              onClick={() => setFftSpawnEnabled(!fftSpawnEnabled)}
               className={`text-[0.55rem] px-2 py-0.5 rounded border transition-colors ${
                 fftSpawnEnabled
                   ? 'text-electric-purple border-electric-purple/40 bg-electric-purple/10'
@@ -239,14 +278,14 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
               <div className="flex items-center gap-2 mt-1.5">
                 <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Thresh</span>
                 <input type="range" min={0.1} max={0.9} step={0.05} value={fftSpawnThreshold}
-                  onChange={e => onFftSpawnThreshold(Number(e.target.value))}
+                  onChange={e => setFftSpawnThreshold(Number(e.target.value))}
                   className="flex-1 h-1 accent-electric-purple" />
                 <span className="text-[0.55rem] w-8 text-right">{(fftSpawnThreshold * 100).toFixed(0)}%</span>
               </div>
               <div className="flex items-center gap-2 mt-1.5">
                 <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Rate</span>
                 <input type="range" min={50} max={500} step={25} value={fftSpawnRate}
-                  onChange={e => onFftSpawnRate(Number(e.target.value))}
+                  onChange={e => setFftSpawnRate(Number(e.target.value))}
                   className="flex-1 h-1 accent-electric-purple" />
                 <span className="text-[0.55rem] w-10 text-right">{fftSpawnRate}ms</span>
               </div>
@@ -254,10 +293,10 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           )}
         </div>
         <EnvelopeControls
-          attack={envAttack} onAttackChange={onEnvAttack}
-          decay={envDecay} onDecayChange={onEnvDecay}
-          sustain={envSustain} onSustainChange={onEnvSustain}
-          release={envRelease} onReleaseChange={onEnvRelease}
+          attack={envAttack} onAttackChange={setEnvAttack}
+          decay={envDecay} onDecayChange={setEnvDecay}
+          sustain={envSustain} onSustainChange={setEnvSustain}
+          release={envRelease} onReleaseChange={setEnvRelease}
         />
         </>
       )}
@@ -418,8 +457,8 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
         onWallRipChange={onWallRipChange}
       />
 
-      <PaletteModeToggle tuning={tuning} onChange={onChange} />
-      <WavelengthBandSelector tuning={tuning} onChange={onChange} />
+      <PaletteModeToggle tuning={tuning} onChange={setTuning} />
+      <WavelengthBandSelector tuning={tuning} onChange={setTuning} />
 
       {/* God Mode & Pointer Hover Toggles */}
       <div className="flex gap-2 mb-2 w-full">
@@ -430,7 +469,7 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           ⚡ God Mode
         </button>
         <button 
-          onClick={() => onCursorHideChange(!hideCursor)}
+          onClick={() => setHideCursor(!hideCursor)}
           className={`flex-1 text-[0.6rem] uppercase tracking-wider border px-2 py-1 rounded transition-colors ${hideCursor ? 'border-red-400/50 bg-red-400/10 text-red-400' : 'border-cold-white-dim/20 text-cold-white-dim/50 hover:border-cold-white-dim/40'}`}
         >
           {hideCursor ? '🚫 Cursor Off' : '🖱 Cursor On'}
@@ -463,7 +502,7 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           <button
             onClick={() => {
               const next = ((tuning.zoomMode ?? 0) + 1) % 3
-              onChange({ ...tuning, zoomMode: next })
+              setTuning({ ...tuning, zoomMode: next })
             }}
             className="text-[0.55rem] text-cold-white-dim/50 hover:text-electric-purple border border-cold-white-dim/10 rounded px-2 py-0.5"
           >
@@ -500,7 +539,7 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           hideCursor,
         }}
         onChange={(loadedTuning) => {
-          onChange(loadedTuning)
+          setTuning(loadedTuning)
           if (loadedTuning.autoSim) {
             sim.setSimActive(loadedTuning.autoSim.active)
             sim.setSimMode(loadedTuning.autoSim.mode)
@@ -516,38 +555,14 @@ export function DevPanel({ tuning, energy, onChange, energyOverride, onEnergyOve
           if (loadedTuning.ripBlocked !== undefined) {
             onWallRipChange(loadedTuning.ripBlocked)
           }
-          // Restore audio settings
-          if (loadedTuning.audioEnabled !== undefined) onAudioToggle(loadedTuning.audioEnabled)
-          if (loadedTuning.masterVolume !== undefined) onMasterVolume(loadedTuning.masterVolume)
-          if (loadedTuning.droneVolume !== undefined) onDroneVolume(loadedTuning.droneVolume)
-          if (loadedTuning.notesVolume !== undefined) onNotesVolume(loadedTuning.notesVolume)
-          if (loadedTuning.synthWaveform) onSynthWaveform(loadedTuning.synthWaveform)
-          if (loadedTuning.synthFilterQ !== undefined) onSynthFilterQ(loadedTuning.synthFilterQ)
-          if (loadedTuning.audioReactive !== undefined) onAudioReactive(loadedTuning.audioReactive)
-          if (loadedTuning.synthScale) onSynthScale(loadedTuning.synthScale as ScaleName)
-          if (loadedTuning.unisonCount !== undefined) onUnisonCount(loadedTuning.unisonCount)
-          if (loadedTuning.detuneSpread !== undefined) onDetuneSpread(loadedTuning.detuneSpread)
-          // FX
-          if (loadedTuning.delayTime !== undefined) onDelayTime(loadedTuning.delayTime)
-          if (loadedTuning.delayFeedback !== undefined) onDelayFeedback(loadedTuning.delayFeedback)
-          if (loadedTuning.delayMix !== undefined) onDelayMix(loadedTuning.delayMix)
-          if (loadedTuning.reverbMix !== undefined) onReverbMix(loadedTuning.reverbMix)
-          if (loadedTuning.reverbDecay !== undefined) onReverbDecay(loadedTuning.reverbDecay)
-          if (loadedTuning.distortion !== undefined) onDistortion(loadedTuning.distortion)
-          if (loadedTuning.autoDistortion !== undefined) onAutoDistortion(loadedTuning.autoDistortion)
-          if (loadedTuning.fftSpawnEnabled !== undefined) onFftSpawnEnabled(loadedTuning.fftSpawnEnabled)
-          if (loadedTuning.fftSpawnThreshold !== undefined) onFftSpawnThreshold(loadedTuning.fftSpawnThreshold)
-          if (loadedTuning.fftSpawnRate !== undefined) onFftSpawnRate(loadedTuning.fftSpawnRate)
-          if (loadedTuning.envAttack !== undefined) onEnvAttack(loadedTuning.envAttack)
-          if (loadedTuning.envDecay !== undefined) onEnvDecay(loadedTuning.envDecay)
-          if (loadedTuning.envSustain !== undefined) onEnvSustain(loadedTuning.envSustain)
-          if (loadedTuning.envRelease !== undefined) onEnvRelease(loadedTuning.envRelease)
-          if (loadedTuning.hideCursor !== undefined) onCursorHideChange(loadedTuning.hideCursor)
+          // Hydrate audio store from loaded preset
+          hydrateFromTuning(loadedTuning)
+          if (loadedTuning.hideCursor !== undefined) setHideCursor(loadedTuning.hideCursor)
         }}
         canvasRef={canvasRef}
       />
       <ExportControls canvasRef={canvasRef} />
-      <BarrierControls tuning={tuning} onChange={onChange} />
+      <BarrierControls tuning={tuning} onChange={setTuning} />
       <AutoSimControls sim={sim} />
 
       {/* Gravity body position indicators */}
