@@ -75,7 +75,6 @@ export function useHandSynth({ audio, hand, simClickQueueRef }: UseHandSynthPara
   const wasRightPinchingRef = useRef(false)
   const prevGestureRef = useRef<string>('neutral')
   const gestureResetRef = useRef<{ distortion?: number; reverbMix?: number; waveSpeed?: number } | null>(null)
-  const handTrailRef = useRef(0)
   const [currentFreq, setCurrentFreq] = useState(0)
 
   // Looper / MIDI / Recorder
@@ -243,11 +242,6 @@ export function useHandSynth({ audio, hand, simClickQueueRef }: UseHandSynthPara
         wasRightPinchingRef.current = rightH.pinching
       }
 
-      const trailHand = leftH.detected ? leftH : rightH
-      if (trailHand.detected && now - handTrailRef.current > 80) {
-        handTrailRef.current = now
-        simClickQueueRef.current.push({ x: trailHand.x, y: trailHand.y })
-      }
     }
 
     // FFT → Wave Spawning
