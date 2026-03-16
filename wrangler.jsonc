@@ -6,6 +6,7 @@
   "observability": {
     "enabled": true
   },
+  "main": "src/worker.ts",
   "routes": [
     {
       "pattern": "zpe.vc",
@@ -14,6 +15,7 @@
   ],
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
     "not_found_handling": "single-page-application"
   }
 }

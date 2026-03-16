@@ -365,7 +365,11 @@ export default function App() {
             simMousePos={simMousePosRef}
             gravBodyPositions={gravBodyPositionsRef}
             onZoomChange={handleZoomChange}
-            onManualClick={(x, _y) => audio.triggerClick(x)}
+            onManualClick={(x, y) => {
+              const freq = yToFreq(y, synthScale)
+              audio.playNote(freq, 0.6)
+              audio.triggerClick(x)
+            }}
             onCanvasReady={(c) => { canvasRef.current = c }}
             audioBands={audioReactive ? audio.fftRef : undefined}
             handTrackingActive={hand.active}
