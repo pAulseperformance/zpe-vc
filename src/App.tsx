@@ -87,6 +87,14 @@ export default function App() {
   useEffect(() => {
     if (audioEnabled) {
       audio.start()
+      // Autoplay policy resilience: ensure context resumes on user interaction
+      const unlockAudio = () => audio.resumeIfSuspended()
+      window.addEventListener('pointerdown', unlockAudio)
+      window.addEventListener('keydown', unlockAudio)
+      return () => {
+        window.removeEventListener('pointerdown', unlockAudio)
+        window.removeEventListener('keydown', unlockAudio)
+      }
     } else {
       audio.stop()
     }

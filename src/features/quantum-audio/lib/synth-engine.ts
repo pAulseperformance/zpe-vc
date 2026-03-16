@@ -132,6 +132,13 @@ export class SynthEngine {
     }, 1500)
   }
 
+  resumeIfSuspended(): void {
+    const ctx = this.nodes?.ctx
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {})
+    }
+  }
+
   // ── Configuration ──────────────────────────────────────
 
   setWaveform(wf: SynthWaveform): void {

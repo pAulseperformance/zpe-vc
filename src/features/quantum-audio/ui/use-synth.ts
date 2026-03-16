@@ -91,9 +91,13 @@ export function useSynth() {
     return getEngine().getRecordingStream()
   }, [])
 
+  const resumeIfSuspended = useCallback(() => {
+    getEngine().resumeIfSuspended()
+  }, [])
+
   // Stable reference — prevents useEffect re-runs that kill sustained notes
   return useMemo(() => ({
-    start, stop, update, triggerClick, playNote, getRecordingStream,
+    start, stop, resumeIfSuspended, update, triggerClick, playNote, getRecordingStream,
     setWaveform, setFilterQ, setScale,
     setUnisonCount, setDetuneSpread,
     setDelayTime, setDelayFeedback, setDelayMix,
@@ -103,7 +107,7 @@ export function useSynth() {
     activeRef,
     fftRef: fftRef as MutableRefObject<FFTBands>,
   }), [
-    start, stop, update, triggerClick, playNote, getRecordingStream,
+    start, stop, resumeIfSuspended, update, triggerClick, playNote, getRecordingStream,
     setWaveform, setFilterQ, setScale,
     setUnisonCount, setDetuneSpread,
     setDelayTime, setDelayFeedback, setDelayMix,
