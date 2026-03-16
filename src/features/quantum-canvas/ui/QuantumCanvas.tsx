@@ -2,7 +2,8 @@ import { useRef, useMemo, useCallback } from 'react'
 import type { MutableRefObject } from 'react'
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
-import * as THREE from 'three'
+import { Vector2 } from 'three'
+import type { Mesh, ShaderMaterial } from 'three'
 
 import vertexShader from '../lib/shaders/quantum.vert'
 import fragmentShader from '../lib/shaders/quantum.frag'
@@ -39,11 +40,11 @@ interface ShaderPlaneProps {
 }
 
 function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick, onManualRelease, audioBands, handTrackingActive, handTrackingPos }: ShaderPlaneProps) {
-  const meshRef = useRef<THREE.Mesh>(null)
+  const meshRef = useRef<Mesh>(null)
   const { size } = useThree()
 
-  const mouseRef = useRef(new THREE.Vector2(0.5, 0.5))
-  const prevMouseRef = useRef(new THREE.Vector2(0.5, 0.5))
+  const mouseRef = useRef(new Vector2(0.5, 0.5))
+  const prevMouseRef = useRef(new Vector2(0.5, 0.5))
   const energyRef = useRef(0)
   const hasRippedRef = useRef(false)
   const heatFieldRef = useRef(0)
@@ -56,11 +57,11 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
   const uniforms = useMemo(
     () => ({
       uTime: { value: 0 },
-      uResolution: { value: new THREE.Vector2(size.width, size.height) },
-      uMouse: { value: new THREE.Vector2(0.5, 0.5) },
+      uResolution: { value: new Vector2(size.width, size.height) },
+      uMouse: { value: new Vector2(0.5, 0.5) },
       uEnergy: { value: 0 },
       uRipFlash: { value: 0 },
-      uCatalysts: { value: Array.from({ length: MAX_CATALYSTS }, () => new THREE.Vector2(0, 0)) },
+      uCatalysts: { value: Array.from({ length: MAX_CATALYSTS }, () => new Vector2(0, 0)) },
       uCatalystTimes: { value: new Float32Array(MAX_CATALYSTS) },
       uCatalystCount: { value: 0 },
       // Tunable uniforms
@@ -83,7 +84,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
       uPaletteMode: { value: tuning.paletteMode ?? 1 },
       uStarField: { value: tuning.starField ?? 0 },
       uWavelength: { value: tuning.wavelength ?? 2 },
-      uMouseVelocity: { value: new THREE.Vector2(0, 0) },
+      uMouseVelocity: { value: new Vector2(0, 0) },
       // Barrier / Diffraction
       uBarrierEnabled: { value: tuning.barrierEnabled ?? 0 },
       uBarrierY: { value: tuning.barrierY ?? 0.5 },
@@ -150,7 +151,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
   )
 
   useFrame((state, delta) => {
-    const mat = meshRef.current?.material as THREE.ShaderMaterial | undefined
+    const mat = meshRef.current?.material as ShaderMaterial | undefined
     if (!mat) return
 
     const now = state.clock.elapsedTime
@@ -230,7 +231,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
     }
 
     // Catalyst uniforms
-    const catPositions = mat.uniforms.uCatalysts.value as THREE.Vector2[]
+    const catPositions = mat.uniforms.uCatalysts.value as Vector2[]
     const catTimes = mat.uniforms.uCatalystTimes.value as Float32Array
 
     for (let i = 0; i < MAX_CATALYSTS; i++) {
