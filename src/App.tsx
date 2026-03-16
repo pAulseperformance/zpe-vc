@@ -119,13 +119,10 @@ export default function App() {
       const key = e.key.toLowerCase()
       const freq = keyMap[key]
       if (freq) {
-        // Match mouse click sound behavior precisely
         audio.playNote(freq, 0.6)
-        
-        // Spawn Catalyst on screen
+        // Spawn visual catalyst on screen
         const pitchNorm = (Math.log2(freq) - Math.log2(130.81)) / (Math.log2(880) - Math.log2(130.81))
         const mappedX = 0.1 + pitchNorm * 0.8
-        audio.triggerClick(mappedX)
         simClickQueueRef.current.push({ x: mappedX, y: 0.3 + Math.random() * 0.4 })
       }
     }
@@ -142,10 +139,8 @@ export default function App() {
 
   const handleSimClick = useCallback((x: number, y: number) => {
     simClickQueueRef.current.push({ x, y })
-    // Play a scale-quantized note based on click Y position
     const freq = yToFreq(y, synthScale)
     audio.playNote(freq, 0.6)
-    audio.triggerClick(x)
   }, [audio, synthScale])
 
   const handleSimMouseUpdate = useCallback((x: number, y: number) => {
@@ -365,10 +360,9 @@ export default function App() {
             simMousePos={simMousePosRef}
             gravBodyPositions={gravBodyPositionsRef}
             onZoomChange={handleZoomChange}
-            onManualClick={(x, y) => {
+            onManualClick={(_x, y) => {
               const freq = yToFreq(y, synthScale)
               audio.playNote(freq, 0.6)
-              audio.triggerClick(x)
             }}
             onCanvasReady={(c) => { canvasRef.current = c }}
             audioBands={audioReactive ? audio.fftRef : undefined}
