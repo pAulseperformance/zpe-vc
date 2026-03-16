@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, Suspense, lazy } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-const QuantumCanvas = lazy(() => import('@/features/quantum-canvas/ui/QuantumCanvas'))
+import QuantumCanvas from '@/features/quantum-canvas/ui/QuantumCanvas'
 const DevPanel = lazy(() => import('@/features/quantum-canvas/ui/DevPanel').then(m => ({ default: m.DevPanel })))
 import { TerminalIntake } from '@/widgets/terminal-intake'
 import { DevModeButton } from '@/widgets/dev-mode-button/DevModeButton'
@@ -144,7 +144,6 @@ export default function App() {
         transition={{ duration: 1.5, delay: isForging ? 0.3 : 0 }}
         style={{ pointerEvents: isForging ? 'none' : 'auto', cursor: hideCursor ? 'none' : 'crosshair' }}
       >
-        <Suspense fallback={<div className="absolute inset-0 bg-black" />}>
           <QuantumCanvas
             onRip={onRip}
             tuning={tuning}
@@ -169,7 +168,6 @@ export default function App() {
             handTrackingActive={hand.active}
             handTrackingPos={hand.stateRef}
           />
-        </Suspense>
       </motion.div>
 
       <NoteOverlay
