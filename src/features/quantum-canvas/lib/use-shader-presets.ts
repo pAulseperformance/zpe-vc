@@ -3,7 +3,7 @@ import type { ShaderTuning } from './shader-tuning'
 import { BUILT_IN_PRESETS, DEFAULT_TUNING } from './shader-tuning'
 
 const STORAGE_KEY = 'zpe-shader-presets-v2'
-const ACTIVE_KEY = 'zpe-shader-active-v3'
+const ACTIVE_KEY = 'zpe-shader-active-v4'
 const THUMBNAIL_KEY = 'zpe-shader-thumbnails-v1'
 
 export type PresetMap = Record<string, ShaderTuning>
