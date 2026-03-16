@@ -101,8 +101,9 @@ export default function App() {
   }, [audioEnabled, audio])
 
   // Keyboard → synth notes (chromatic scale across 3 rows)
+  // Disabled during terminal intake so user can actually type
   useEffect(() => {
-    if (!audioEnabled) return
+    if (!audioEnabled || isForging) return
 
     // C3=130.81, C4=261.63, C5=523.25
     const keyMap: Record<string, number> = {
@@ -131,7 +132,7 @@ export default function App() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [audioEnabled, audio, simClickQueueRef])
+  }, [audioEnabled, isForging, audio, simClickQueueRef])
 
   const onRip = useCallback(() => {
     if (!wallRip) setIsForging(true)
@@ -330,8 +331,8 @@ export default function App() {
   const handleZoomChange = useCallback((delta: number) => {
     setTuning(prev => {
       const current = prev.viewScale ?? 1.0
-      let next = current + delta
-      next = Math.max(0.5, Math.min(3.0, next))
+      const next = current + delta
+      if (next <= 0.01) return prev // prevent zero/negative scale
       if (next === current) return prev
       return { ...prev, viewScale: next, zoomMode: 0 }
     })
