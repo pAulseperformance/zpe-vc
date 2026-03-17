@@ -95,21 +95,18 @@ export function TerminalIntake({ onBootDone, forgeToken }: { onBootDone?: () => 
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [conversation, forgeResponse])
 
-  // Enter to continue after response
+  // Auto-reset input after AI finishes responding
   useEffect(() => {
     if (forgeState !== 'done') return
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        setConversation(prev => [...prev, { idea: input, response: forgeResponse }])
-        setForgeState('idle')
-        setForgeResponse('')
-        setInput('')
-        setTimeout(() => inputRef.current?.focus(), 100)
-      }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [forgeState, input, forgeResponse])
+    const timer = setTimeout(() => {
+      setConversation(prev => [...prev, { idea: input, response: forgeResponse }])
+      setForgeState('idle')
+      setForgeResponse('')
+      setInput('')
+      setTimeout(() => inputRef.current?.focus(), 100)
+    }, 1000) // brief pause so user can read the response
+    return () => clearTimeout(timer)
+  }, [forgeState]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
@@ -294,27 +291,14 @@ export function TerminalIntake({ onBootDone, forgeToken }: { onBootDone?: () => 
         )}
 
         {forgeState === 'done' && (
-          <motion.div
+          <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.5 }}
-            className="mt-6 flex items-center gap-4 font-mono text-[0.6rem] tracking-[0.15em] text-cold-white-dim/20 uppercase"
+            transition={{ duration: 0.5 }}
+            className="mt-6 font-mono text-[0.6rem] tracking-[0.15em] text-cold-white-dim/15 uppercase"
           >
-            <button
-              onClick={() => {
-                setConversation(prev => [...prev, { idea: input, response: forgeResponse }])
-                setForgeState('idle')
-                setForgeResponse('')
-                setInput('')
-                setTimeout(() => inputRef.current?.focus(), 100)
-              }}
-              className="hover:text-electric-purple/50 transition-colors cursor-pointer"
-            >
-              [Enter] Continue
-            </button>
-            <span className="text-cold-white-dim/10">│</span>
-            <span>Press Escape to return to the void</span>
-          </motion.div>
+            Press Escape to return to the void
+          </motion.p>
         )}
       </div>
       </div>
