@@ -66,7 +66,9 @@ export function TerminalIntake({ onBootDone, forgeToken }: { onBootDone?: () => 
   const [input, setInput] = useState('')
   const [forgeState, setForgeState] = useState<'idle' | 'forging' | 'done'>('idle')
   const [forgeResponse, setForgeResponse] = useState('')
+  const [conversation, setConversation] = useState<Array<{ idea: string; response: string }>>([])
   const inputRef = useRef<HTMLInputElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   const handleLineDone = () => {
     const next = activeLine + 1
@@ -87,6 +89,27 @@ export function TerminalIntake({ onBootDone, forgeToken }: { onBootDone?: () => 
       return () => clearTimeout(timer)
     }
   }, [showInput, forgeState])
+
+  // Auto-scroll to bottom when conversation grows
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+  }, [conversation, forgeResponse])
+
+  // Enter to continue after response
+  useEffect(() => {
+    if (forgeState !== 'done') return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        setConversation(prev => [...prev, { idea: input, response: forgeResponse }])
+        setForgeState('idle')
+        setForgeResponse('')
+        setInput('')
+        setTimeout(() => inputRef.current?.focus(), 100)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [forgeState, input, forgeResponse])
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
@@ -145,11 +168,16 @@ export function TerminalIntake({ onBootDone, forgeToken }: { onBootDone?: () => 
       }
 
       setForgeState('done')
+      // After a brief pause, add to conversation history and reset for next input
+      setTimeout(() => {
+        setConversation(prev => [...prev, { idea, response: '' }])
+        // The response will be captured via the final forgeResponse state
+      }, 100)
     } catch {
       setForgeResponse('> connection to the forge was severed.')
       setForgeState('done')
     }
-  }, [input, forgeState])
+  }, [input, forgeState, forgeToken])
 
   return (
     <motion.div
@@ -159,6 +187,7 @@ export function TerminalIntake({ onBootDone, forgeToken }: { onBootDone?: () => 
       className="absolute inset-0 z-30 flex items-center justify-center bg-black"
     >
       <div className="w-full max-w-2xl px-8">
+      <div ref={scrollRef} className="max-h-[70vh] overflow-y-auto">
         {/* Boot sequence */}
         {BOOT_LINES.map((line, i) => (
           <BootLine
@@ -168,6 +197,20 @@ export function TerminalIntake({ onBootDone, forgeToken }: { onBootDone?: () => 
             start={i <= activeLine}
             onDone={i === activeLine ? handleLineDone : () => {}}
           />
+        ))}
+
+        {/* Conversation history */}
+        {conversation.map((entry, i) => (
+          <div key={i} className="mt-4">
+            <div className="font-mono text-sm text-cold-white-dim/40">
+              <span className="text-electric-purple/40">{'> '}</span>
+              <span className="text-cold-white-dim/30">initiate_forge: </span>
+              <span className="text-cold-white-dim/50">{entry.idea}</span>
+            </div>
+            <div className="mt-2 font-mono text-sm leading-relaxed text-cold-white-dim/40 border-l-2 border-electric-purple/15 pl-4">
+              {entry.response}
+            </div>
+          </div>
         ))}
 
         {/* Input line */}
@@ -244,7 +287,7 @@ export function TerminalIntake({ onBootDone, forgeToken }: { onBootDone?: () => 
         )}
 
         {/* Hint */}
-        {bootDone && showInput && forgeState === 'idle' && (
+        {bootDone && showInput && forgeState === 'idle' && conversation.length === 0 && (
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -256,15 +299,29 @@ export function TerminalIntake({ onBootDone, forgeToken }: { onBootDone?: () => 
         )}
 
         {forgeState === 'done' && (
-          <motion.p
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.8 }}
-            className="mt-8 font-mono text-[0.6rem] tracking-[0.15em] text-cold-white-dim/15 uppercase"
+            transition={{ duration: 0.5, delay: 0.5 }}
+            className="mt-6 flex items-center gap-4 font-mono text-[0.6rem] tracking-[0.15em] text-cold-white-dim/20 uppercase"
           >
-            Press Escape to return to the void
-          </motion.p>
+            <button
+              onClick={() => {
+                setConversation(prev => [...prev, { idea: input, response: forgeResponse }])
+                setForgeState('idle')
+                setForgeResponse('')
+                setInput('')
+                setTimeout(() => inputRef.current?.focus(), 100)
+              }}
+              className="hover:text-electric-purple/50 transition-colors cursor-pointer"
+            >
+              [Enter] Continue
+            </button>
+            <span className="text-cold-white-dim/10">│</span>
+            <span>Press Escape to return to the void</span>
+          </motion.div>
         )}
+      </div>
       </div>
     </motion.div>
   )
