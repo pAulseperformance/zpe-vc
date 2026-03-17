@@ -168,11 +168,6 @@ export function TerminalIntake({ onBootDone, forgeToken }: { onBootDone?: () => 
       }
 
       setForgeState('done')
-      // After a brief pause, add to conversation history and reset for next input
-      setTimeout(() => {
-        setConversation(prev => [...prev, { idea, response: '' }])
-        // The response will be captured via the final forgeResponse state
-      }, 100)
     } catch {
       setForgeResponse('> connection to the forge was severed.')
       setForgeState('done')
@@ -214,7 +209,7 @@ export function TerminalIntake({ onBootDone, forgeToken }: { onBootDone?: () => 
         ))}
 
         {/* Input line */}
-        {showInput && (
+        {showInput && forgeState !== 'done' && (
           <motion.form
             onSubmit={handleSubmit}
             initial={{ opacity: 0 }}
