@@ -59,7 +59,7 @@ function BootLine({ text, speed, start, onDone }: {
 }
 
 /* ─── Terminal Intake ─── */
-export function TerminalIntake({ onBootDone }: { onBootDone?: () => void }) {
+export function TerminalIntake({ onBootDone, forgeToken }: { onBootDone?: () => void; forgeToken?: string | null }) {
   const [activeLine, setActiveLine] = useState(0)
   const [bootDone, setBootDone] = useState(false)
   const [showInput, setShowInput] = useState(false)
@@ -97,11 +97,20 @@ export function TerminalIntake({ onBootDone }: { onBootDone?: () => void }) {
     setForgeResponse('')
 
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (forgeToken) headers['Authorization'] = `Bearer ${forgeToken}`
+
       const res = await fetch('/api/forge', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ idea }),
       })
+
+      if (res.status === 401) {
+        setForgeResponse('> forge access denied. the rip was not earned.')
+        setForgeState('done')
+        return
+      }
 
       if (!res.ok || !res.body) {
         setForgeResponse('> the forge is silent. try again.')

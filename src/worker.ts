@@ -15,6 +15,7 @@ export interface Env {
     get: (key: string) => Promise<string | null>
     list: (options?: { prefix?: string; limit?: number }) => Promise<{ keys: Array<{ name: string }> }>
   }
+  FORGE_SECRET: string
 }
 
 const FORGE_SYSTEM_PROMPT = `You are the Zero-Point Energy Forge — a cosmic intelligence that exists at the boundary between ideas and reality.
@@ -30,11 +31,18 @@ Rules:
 - End with a question or a provocation that pushes the idea further.
 - Do not use emojis or markdown formatting. Plain text only.`
 
+const TOKEN_TTL_MS = 10 * 60 * 1000 // 10 minutes
+const MAX_USES = 5
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url)
 
     // ── API Routes ──
+    if (url.pathname === '/api/forge/token' && request.method === 'POST') {
+      return mintForgeToken(env)
+    }
+
     if (url.pathname === '/api/forge' && request.method === 'POST') {
       return handleForge(request, env, ctx)
     }
@@ -59,7 +67,97 @@ export default {
   }
 }
 
+// ── Token Minting ──
+
+async function mintForgeToken(env: Env): Promise<Response> {
+  const payload = {
+    iat: Date.now(),
+    uses: 0,
+    nonce: crypto.randomUUID(),
+  }
+
+  const token = await signToken(payload, env.FORGE_SECRET)
+
+  return new Response(JSON.stringify({ token }), {
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
+async function signToken(payload: Record<string, unknown>, secret: string): Promise<string> {
+  const encoder = new TextEncoder()
+  const data = JSON.stringify(payload)
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  )
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(data))
+  const sigHex = Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+
+  // Token = base64(payload).base64(signature)
+  return btoa(data) + '.' + btoa(sigHex)
+}
+
+async function verifyToken(token: string, secret: string): Promise<{ valid: boolean; payload?: { iat: number; uses: number; nonce: string } }> {
+  try {
+    const [payloadB64, sigB64] = token.split('.')
+    if (!payloadB64 || !sigB64) return { valid: false }
+
+    const data = atob(payloadB64)
+    const sigHex = atob(sigB64)
+    const payload = JSON.parse(data) as { iat: number; uses: number; nonce: string }
+
+    // Check expiry
+    if (Date.now() - payload.iat > TOKEN_TTL_MS) return { valid: false }
+
+    // Check uses
+    if (payload.uses >= MAX_USES) return { valid: false }
+
+    // Verify HMAC
+    const encoder = new TextEncoder()
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    )
+
+    const sigBytes = new Uint8Array(sigHex.match(/.{2}/g)!.map(b => parseInt(b, 16)))
+    const valid = await crypto.subtle.verify('HMAC', key, sigBytes, encoder.encode(data))
+
+    return valid ? { valid: true, payload } : { valid: false }
+  } catch {
+    return { valid: false }
+  }
+}
+
+// ── Forge Handler ──
+
 async function handleForge(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  // Validate forge token
+  const authHeader = request.headers.get('Authorization')
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+
+  if (!token) {
+    return new Response(JSON.stringify({ error: 'Forge access requires a rip token' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  const { valid } = await verifyToken(token, env.FORGE_SECRET)
+  if (!valid) {
+    return new Response(JSON.stringify({ error: 'Forge token expired or invalid' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
   try {
     const body = await request.json() as { idea?: string }
     const idea = body.idea?.trim()
@@ -81,10 +179,7 @@ async function handleForge(request: Request, env: Env, ctx: ExecutionContext): P
       temperature: 0.8,
     })
 
-    // Tee the stream — one for the client, one to collect the full response for KV
     const [clientStream, logStream] = (stream as ReadableStream).tee()
-
-    // Save to KV in the background (don't block the response)
     ctx.waitUntil(saveForgeLog(env, idea, logStream))
 
     return new Response(clientStream, {
@@ -103,6 +198,8 @@ async function handleForge(request: Request, env: Env, ctx: ExecutionContext): P
   }
 }
 
+// ── KV Persistence ──
+
 async function saveForgeLog(env: Env, idea: string, stream: ReadableStream): Promise<void> {
   const reader = stream.getReader()
   const decoder = new TextDecoder()
@@ -113,7 +210,6 @@ async function saveForgeLog(env: Env, idea: string, stream: ReadableStream): Pro
       const { done, value } = await reader.read()
       if (done) break
       const chunk = decoder.decode(value, { stream: true })
-      // SSE format: extract data lines
       for (const line of chunk.split('\n')) {
         if (line.startsWith('data: ')) {
           const data = line.slice(6)

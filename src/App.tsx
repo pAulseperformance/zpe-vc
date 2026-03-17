@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, Suspense, lazy } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import QuantumCanvas from '@/features/quantum-canvas/ui/QuantumCanvas'
+const QuantumCanvas = lazy(() => import('@/features/quantum-canvas/ui/QuantumCanvas'))
 const DevPanel = lazy(() => import('@/features/quantum-canvas/ui/DevPanel').then(m => ({ default: m.DevPanel })))
 import { TerminalIntake } from '@/widgets/terminal-intake'
 import { DevModeButton } from '@/widgets/dev-mode-button/DevModeButton'
@@ -108,8 +108,18 @@ export default function App() {
   useKeyboardSynth({ audioEnabled, isForging, audio, synthScale, simClickQueueRef })
 
   // ── Callbacks ──
-  const onRip = useCallback(() => {
-    if (!wallRip) setIsForging(true)
+  const forgeTokenRef = useRef<string | null>(null)
+
+  const onRip = useCallback(async () => {
+    if (wallRip) return
+    try {
+      const res = await fetch('/api/forge/token', { method: 'POST' })
+      if (res.ok) {
+        const { token } = await res.json() as { token: string }
+        forgeTokenRef.current = token
+      }
+    } catch { /* forge will show error state */ }
+    setIsForging(true)
   }, [wallRip, setIsForging])
 
   const handleSimClick = useCallback((x: number, y: number) => {
@@ -138,12 +148,18 @@ export default function App() {
 
   return (
     <div className="relative h-screen w-screen bg-black overflow-hidden">
+      {/* CSS starfield — instant visual, z-0 base layer */}
+      <div className="starfield absolute inset-0 z-0">
+        <div className="starfield-nebula" />
+      </div>
+
       <motion.div
-        className="absolute inset-0 z-0"
+        className="absolute inset-0 z-10"
         animate={{ opacity: isForging ? 0 : 1 }}
         transition={{ duration: 1.5, delay: isForging ? 0.3 : 0 }}
         style={{ pointerEvents: isForging ? 'none' : 'auto', cursor: hideCursor ? 'none' : 'crosshair' }}
       >
+        <Suspense fallback={null}>
           <QuantumCanvas
             onRip={onRip}
             tuning={tuning}
@@ -168,6 +184,7 @@ export default function App() {
             handTrackingActive={hand.active}
             handTrackingPos={hand.stateRef}
           />
+        </Suspense>
       </motion.div>
 
       <NoteOverlay
@@ -178,7 +195,7 @@ export default function App() {
       />
 
       <AnimatePresence>
-        {isForging && <TerminalIntake onBootDone={handleBootDone} />}
+        {isForging && <TerminalIntake onBootDone={handleBootDone} forgeToken={forgeTokenRef.current} />}
       </AnimatePresence>
 
       <AnimatePresence>
