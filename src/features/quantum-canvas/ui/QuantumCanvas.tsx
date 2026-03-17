@@ -34,12 +34,13 @@ interface ShaderPlaneProps {
   onZoomChange: (delta: number) => void
   onManualClick?: (x: number, y: number) => void
   onManualRelease?: () => void
+  onManualDrag?: (x: number, y: number) => void
   audioBands?: MutableRefObject<{bass: number, mid: number, treble: number}>
   handTrackingActive?: boolean
   handTrackingPos?: MutableRefObject<{x: number, y: number, detected: boolean}>
 }
 
-function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick, onManualRelease, audioBands, handTrackingActive, handTrackingPos }: ShaderPlaneProps) {
+function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick, onManualRelease, onManualDrag, audioBands, handTrackingActive, handTrackingPos }: ShaderPlaneProps) {
   const meshRef = useRef<Mesh>(null)
   const { size } = useThree()
 
@@ -49,6 +50,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
   const hasRippedRef = useRef(false)
   const heatFieldRef = useRef(0)
   const ripFlashRef = useRef(0)
+  const isDownRef = useRef(false)
   const catalystsRef = useRef<Catalyst[]>([])
   const tuningRef = useRef(tuning)
   tuningRef.current = tuning
@@ -110,13 +112,15 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
       if (e.uv) {
         prevMouseRef.current.copy(mouseRef.current)
         mouseRef.current.set(e.uv.x, e.uv.y)
+        if (isDownRef.current) onManualDrag?.(e.uv.x, e.uv.y)
       }
     },
-    []
+    [onManualDrag]
   )
 
   const onPointerDown = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
+      isDownRef.current = true
       energyRef.current += tuningRef.current.clickSpike
 
       const maxW = Math.floor(tuningRef.current.maxWaves)
@@ -132,6 +136,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
 
   const onPointerUp = useCallback(
     () => {
+      isDownRef.current = false
       onManualRelease?.()
     },
     [onManualRelease]
@@ -139,6 +144,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
 
   const onPointerLeave = useCallback(() => {
     prevMouseRef.current.copy(mouseRef.current)
+    isDownRef.current = false
     onManualRelease?.()
   }, [onManualRelease])
 
@@ -368,13 +374,14 @@ interface QuantumCanvasProps {
   onZoomChange: (delta: number) => void
   onManualClick?: (x: number, y: number) => void
   onManualRelease?: () => void
+  onManualDrag?: (x: number, y: number) => void
   onCanvasReady?: (canvas: HTMLCanvasElement) => void
   audioBands?: MutableRefObject<{bass: number, mid: number, treble: number}>
   handTrackingActive?: boolean
   handTrackingPos?: MutableRefObject<{x: number, y: number, detected: boolean}>
 }
 
-export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick, onManualRelease, onCanvasReady, audioBands, handTrackingActive, handTrackingPos }: QuantumCanvasProps) {
+export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick, onManualRelease, onManualDrag, onCanvasReady, audioBands, handTrackingActive, handTrackingPos }: QuantumCanvasProps) {
   return (
     <Canvas
       gl={{ antialias: false, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: true }}
@@ -383,7 +390,7 @@ export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, s
       style={{ background: '#000000', cursor: 'none' }}
       onCreated={({ gl }) => onCanvasReady?.(gl.domElement)}
     >
-      <ShaderPlane onRip={onRip} tuning={tuning} onEnergyChange={onEnergyChange} energyOverride={energyOverride} simClickQueue={simClickQueue} simMouseActive={simMouseActive} simMousePos={simMousePos} gravBodyPositions={gravBodyPositions} onZoomChange={onZoomChange} onManualClick={onManualClick} onManualRelease={onManualRelease} audioBands={audioBands} handTrackingActive={handTrackingActive} handTrackingPos={handTrackingPos} />
+      <ShaderPlane onRip={onRip} tuning={tuning} onEnergyChange={onEnergyChange} energyOverride={energyOverride} simClickQueue={simClickQueue} simMouseActive={simMouseActive} simMousePos={simMousePos} gravBodyPositions={gravBodyPositions} onZoomChange={onZoomChange} onManualClick={onManualClick} onManualRelease={onManualRelease} onManualDrag={onManualDrag} audioBands={audioBands} handTrackingActive={handTrackingActive} handTrackingPos={handTrackingPos} />
       <EffectComposer>
         <Bloom
           intensity={1.5}

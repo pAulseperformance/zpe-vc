@@ -175,6 +175,12 @@ export default function App() {
               const freq = yToFreq(y, synthScale)
               mouseNoteRef.current = audio.playNote(freq, 0.6, true)
             }}
+            onManualDrag={(_x, y) => {
+              if (mouseNoteRef.current) {
+                const freq = yToFreq(y, synthScale)
+                mouseNoteRef.current.bend(freq)
+              }
+            }}
             onManualRelease={() => {
               mouseNoteRef.current?.release()
               mouseNoteRef.current = null
