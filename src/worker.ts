@@ -153,7 +153,7 @@ async function handleForge(request: Request, env: Env, ctx: ExecutionContext): P
     })
 
     const [clientStream, logStream] = (stream as ReadableStream).tee()
-  ctx.waitUntil(saveForgeLog(env, parsed.idea, logStream))
+    ctx.waitUntil(saveForgeLog(env, parsed.idea, logStream))
 
     return new Response(clientStream, {
       headers: {
