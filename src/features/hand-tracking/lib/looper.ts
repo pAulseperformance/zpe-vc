@@ -150,7 +150,7 @@ export class Looper {
     for (const layer of this.layers) {
       if (layer.muted) continue
       for (const e of layer.events) {
-        if (this.isEventDue(e.time, elapsed, loopLen)) {
+        if (this.isEventDue(e.time, elapsed)) {
           this.onEvent(e)
         }
       }
@@ -160,7 +160,7 @@ export class Looper {
     this.playRafId = requestAnimationFrame(this.playLoop)
   }
 
-  private isEventDue(eventTime: number, elapsed: number, _loopLen: number): boolean {
+  private isEventDue(eventTime: number, elapsed: number): boolean {
     const prev = this.prevElapsed
     if (elapsed >= prev) {
       return eventTime >= prev && eventTime < elapsed

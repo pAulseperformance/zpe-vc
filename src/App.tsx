@@ -108,7 +108,7 @@ export default function App() {
   useKeyboardSynth({ audioEnabled, isForging, audio, synthScale, simClickQueueRef })
 
   // ── Callbacks ──
-  const forgeTokenRef = useRef<string | null>(null)
+  const [forgeToken, setForgeToken] = useState<string | null>(null)
 
   const onRip = useCallback(async () => {
     if (wallRip) return
@@ -116,7 +116,7 @@ export default function App() {
       const res = await fetch('/api/forge/token', { method: 'POST' })
       if (res.ok) {
         const { token } = await res.json() as { token: string }
-        forgeTokenRef.current = token
+        setForgeToken(token)
       }
     } catch { /* forge will show error state */ }
     setIsForging(true)
@@ -163,6 +163,7 @@ export default function App() {
           <QuantumCanvas
             onRip={onRip}
             tuning={tuning}
+            performanceMode={performanceMode}
             onEnergyChange={handSynth.handleEnergyChange}
             energyOverride={energyOverride}
             simClickQueue={simClickQueueRef}
@@ -201,7 +202,7 @@ export default function App() {
       />
 
       <AnimatePresence>
-        {isForging && <TerminalIntake onBootDone={handleBootDone} forgeToken={forgeTokenRef.current} />}
+        {isForging && <TerminalIntake onBootDone={handleBootDone} forgeToken={forgeToken} />}
       </AnimatePresence>
 
       <AnimatePresence>
@@ -222,13 +223,11 @@ export default function App() {
           onSimClick={handleSimClick}
           wallRip={wallRip}
           onWallRipChange={setWallRip}
-          simMouseActive={simMouseActive}
           onSimMouseActiveChange={setSimMouseActive}
           onSimMouseUpdate={handleSimMouseUpdate}
-          gravBodyPositions={gravBodyPositionsRef}
+          gravBodyPositionsRef={gravBodyPositionsRef}
           canvasRef={canvasRef}
           fftRef={audio.fftRef}
-          audio={audio}
           handTracking={{
             ...hand,
             looper: {

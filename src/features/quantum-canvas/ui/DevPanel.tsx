@@ -28,16 +28,11 @@ interface DevPanelProps {
   onSimClick: (x: number, y: number) => void
   wallRip: boolean
   onWallRipChange: (value: boolean) => void
-  simMouseActive: boolean
   onSimMouseActiveChange: (value: boolean) => void
   onSimMouseUpdate: (x: number, y: number) => void
-  gravBodyPositions: MutableRefObject<{click: {x: number, y: number}, mouse: {x: number, y: number}} | null>
+  gravBodyPositionsRef: MutableRefObject<{click: {x: number, y: number}, mouse: {x: number, y: number}} | null>
   canvasRef: MutableRefObject<HTMLCanvasElement | null>
   fftRef: MutableRefObject<FFTBands>
-  audio: {
-    playNote: (freq: number, vel: number, sustained?: boolean) => { release: () => void; bend: (f: number) => void }
-    getRecordingStream: () => MediaStream | null
-  }
   handTracking: {
     active: boolean
     loading: boolean
@@ -72,7 +67,7 @@ interface DevPanelProps {
   }
 }
 
-export function DevPanel({ energy, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, gravBodyPositions, canvasRef, fftRef, audio: _audio, handTracking, performance }: DevPanelProps) {
+export function DevPanel({ energy, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, onSimMouseActiveChange, onSimMouseUpdate, gravBodyPositionsRef, canvasRef, fftRef, handTracking, performance }: DevPanelProps) {
   // ── Read from stores ──
   const tuning = useTuningStore((s) => s.tuning)
   const setTuning = useTuningStore((s) => s.setTuning)
@@ -136,20 +131,30 @@ export function DevPanel({ energy, energyOverride, onEnergyOverride, onSimClick,
   // Bridge gravity body positions to parent for adaptive zoom
   useEffect(() => {
     if (sim.simMode === 'gravity' && sim.simActive) {
-      const interval = setInterval(() => {
-        gravBodyPositions.current = {
-          click: { ...sim.gravState.current.clickPos },
-          mouse: { ...sim.gravState.current.mousePos },
-        }
-      }, 16)
+      const bridge = {
+        click: { x: sim.gravState.current.clickPos.x, y: sim.gravState.current.clickPos.y },
+        mouse: { x: sim.gravState.current.mousePos.x, y: sim.gravState.current.mousePos.y },
+      }
+      gravBodyPositionsRef.current = bridge
+
+      let frameId = 0
+      const sync = () => {
+        bridge.click.x = sim.gravState.current.clickPos.x
+        bridge.click.y = sim.gravState.current.clickPos.y
+        bridge.mouse.x = sim.gravState.current.mousePos.x
+        bridge.mouse.y = sim.gravState.current.mousePos.y
+        frameId = requestAnimationFrame(sync)
+      }
+      frameId = requestAnimationFrame(sync)
+
       return () => {
-        clearInterval(interval)
-        gravBodyPositions.current = null
+        cancelAnimationFrame(frameId)
+        gravBodyPositionsRef.current = null
       }
     } else {
-      gravBodyPositions.current = null
+      gravBodyPositionsRef.current = null
     }
-  }, [sim.simMode, sim.simActive, sim.gravState, gravBodyPositions])
+  }, [sim.simMode, sim.simActive, sim.gravState, gravBodyPositionsRef])
 
   const handleChange = (key: keyof ShaderTuning, value: number | boolean) => {
     setTuning({ ...tuning, [key]: value } as ShaderTuning)

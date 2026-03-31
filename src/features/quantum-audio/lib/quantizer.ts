@@ -19,7 +19,7 @@ const SCALES: Record<Exclude<ScaleName, 'continuous'>, number[]> = {
 const ROOT_FREQ = 65.40639
 
 // Generate a lookup table of frequencies for each scale across 8 octaves
-const FREQ_TABLES: Record<Exclude<ScaleName, 'continuous'>, number[]> = {} as any
+const FREQ_TABLES: Partial<Record<Exclude<ScaleName, 'continuous'>, number[]>> = {}
 
 for (const [scaleName, intervals] of Object.entries(SCALES)) {
   const freqs: number[] = []

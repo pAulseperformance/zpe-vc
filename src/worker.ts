@@ -1,4 +1,6 @@
 import type { ExecutionContext } from '@cloudflare/workers-types'
+import { MAX_USES, getBearerToken, signToken, verifyToken } from './worker/forge-auth'
+import { isJsonRequest, parseForgeIdea } from './worker/forge-request'
 
 export interface Env {
   ASSETS: { fetch: (req: Request) => Promise<Response> }
@@ -31,9 +33,6 @@ Rules:
 - End with a question or a provocation that pushes the idea further.
 - Do not use emojis or markdown formatting. Plain text only.`
 
-const TOKEN_TTL_MS = 10 * 60 * 1000 // 10 minutes
-const MAX_USES = 5
-
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url)
@@ -48,7 +47,7 @@ export default {
     }
 
     if (url.pathname === '/api/forge/log' && request.method === 'GET') {
-      return handleForgeLog(env)
+      return handleForgeLog(request, env)
     }
 
     // ── Static Assets ──
@@ -83,65 +82,24 @@ async function mintForgeToken(env: Env): Promise<Response> {
   })
 }
 
-async function signToken(payload: Record<string, unknown>, secret: string): Promise<string> {
-  const encoder = new TextEncoder()
-  const data = JSON.stringify(payload)
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  )
-  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(data))
-  const sigHex = Array.from(new Uint8Array(signature))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('')
-
-  // Token = base64(payload).base64(signature)
-  return btoa(data) + '.' + btoa(sigHex)
+async function getServerTokenUses(env: Env, nonce: string): Promise<number> {
+  const value = await env.FORGE_LOG.get(`forge-token:${nonce}`)
+  if (!value) return 0
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
 }
 
-async function verifyToken(token: string, secret: string): Promise<{ valid: boolean; payload?: { iat: number; uses: number; nonce: string } }> {
-  try {
-    const [payloadB64, sigB64] = token.split('.')
-    if (!payloadB64 || !sigB64) return { valid: false }
-
-    const data = atob(payloadB64)
-    const sigHex = atob(sigB64)
-    const payload = JSON.parse(data) as { iat: number; uses: number; nonce: string }
-
-    // Check expiry
-    if (Date.now() - payload.iat > TOKEN_TTL_MS) return { valid: false }
-
-    // Check uses
-    if (payload.uses >= MAX_USES) return { valid: false }
-
-    // Verify HMAC
-    const encoder = new TextEncoder()
-    const key = await crypto.subtle.importKey(
-      'raw',
-      encoder.encode(secret),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['verify']
-    )
-
-    const sigBytes = new Uint8Array(sigHex.match(/.{2}/g)!.map(b => parseInt(b, 16)))
-    const valid = await crypto.subtle.verify('HMAC', key, sigBytes, encoder.encode(data))
-
-    return valid ? { valid: true, payload } : { valid: false }
-  } catch {
-    return { valid: false }
-  }
+async function incrementServerTokenUses(env: Env, nonce: string): Promise<number> {
+  const nextUses = (await getServerTokenUses(env, nonce)) + 1
+  await env.FORGE_LOG.put(`forge-token:${nonce}`, String(nextUses))
+  return nextUses
 }
 
 // ── Forge Handler ──
 
 async function handleForge(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   // Validate forge token
-  const authHeader = request.headers.get('Authorization')
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+  const token = getBearerToken(request)
 
   if (!token) {
     return new Response(JSON.stringify({ error: 'Forge access requires a rip token' }), {
@@ -150,29 +108,44 @@ async function handleForge(request: Request, env: Env, ctx: ExecutionContext): P
     })
   }
 
-  const { valid } = await verifyToken(token, env.FORGE_SECRET)
-  if (!valid) {
+  const verification = await verifyToken(token, env.FORGE_SECRET)
+  if (!verification.valid || !verification.payload) {
     return new Response(JSON.stringify({ error: 'Forge token expired or invalid' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' },
     })
   }
 
-  try {
-    const body = await request.json() as { idea?: string }
-    const idea = body.idea?.trim()
+  if (!isJsonRequest(request)) {
+    return new Response(JSON.stringify({ error: 'Content-Type must be application/json' }), {
+      status: 415,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
 
-    if (!idea) {
-      return new Response(JSON.stringify({ error: 'No idea provided' }), {
+  try {
+    const body = await request.json() as unknown
+    const parsed = parseForgeIdea(body)
+    if (!parsed.ok) {
+      return new Response(JSON.stringify({ error: parsed.error }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       })
     }
 
+    const serverUses = await getServerTokenUses(env, verification.payload.nonce)
+    if (serverUses >= MAX_USES) {
+      return new Response(JSON.stringify({ error: 'Forge token usage limit reached' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+    await incrementServerTokenUses(env, verification.payload.nonce)
+
     const stream = await env.AI.run('@cf/meta/llama-4-scout-17b-16e-instruct', {
       messages: [
         { role: 'system', content: FORGE_SYSTEM_PROMPT },
-        { role: 'user', content: idea },
+        { role: 'user', content: parsed.idea },
       ],
       stream: true,
       max_tokens: 256,
@@ -180,7 +153,7 @@ async function handleForge(request: Request, env: Env, ctx: ExecutionContext): P
     })
 
     const [clientStream, logStream] = (stream as ReadableStream).tee()
-    ctx.waitUntil(saveForgeLog(env, idea, logStream))
+  ctx.waitUntil(saveForgeLog(env, parsed.idea, logStream))
 
     return new Response(clientStream, {
       headers: {
@@ -223,7 +196,7 @@ async function saveForgeLog(env: Env, idea: string, stream: ReadableStream): Pro
     }
   } catch { /* stream error — save what we have */ }
 
-  const key = `forge:${Date.now()}`
+  const key = `forge-log:${Date.now()}`
   await env.FORGE_LOG.put(key, JSON.stringify({
     idea,
     response: fullResponse,
@@ -231,12 +204,35 @@ async function saveForgeLog(env: Env, idea: string, stream: ReadableStream): Pro
   }))
 }
 
-async function handleForgeLog(env: Env): Promise<Response> {
-  const { keys } = await env.FORGE_LOG.list({ prefix: 'forge:', limit: 50 })
+async function handleForgeLog(request: Request, env: Env): Promise<Response> {
+  const token = getBearerToken(request)
+  if (!token) {
+    return new Response(JSON.stringify({ error: 'Missing forge token' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  const { valid } = await verifyToken(token, env.FORGE_SECRET)
+  if (!valid) {
+    return new Response(JSON.stringify({ error: 'Forge token expired or invalid' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  const { keys } = await env.FORGE_LOG.list({ prefix: 'forge-log:', limit: 50 })
   const entries = await Promise.all(
     keys.map(async (k) => {
       const val = await env.FORGE_LOG.get(k.name)
-      return val ? JSON.parse(val) : null
+      if (!val) {
+        return null
+      }
+      try {
+        return JSON.parse(val)
+      } catch {
+        return null
+      }
     })
   )
   return new Response(JSON.stringify(entries.filter(Boolean)), {

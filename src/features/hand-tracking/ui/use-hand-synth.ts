@@ -13,6 +13,7 @@ import { Looper, MidiOutput, AudioRecorder } from '@/features/hand-tracking'
 import type { HandTarget } from '@/features/hand-tracking'
 import { useAudioStore } from '@/features/quantum-audio/model/audio-store'
 import { useTuningStore } from '@/features/quantum-canvas/model/tuning-store'
+import { useUIStore } from '@/shared/model/ui-store'
 
 /** Minimal audio engine interface — what we need from useSynth(). */
 interface AudioEngine {
@@ -61,6 +62,7 @@ export function useHandSynth({ audio, hand, simClickQueueRef }: UseHandSynthPara
   const fftSpawnRate = useAudioStore((s) => s.fftSpawnRate)
   const distortion = useAudioStore((s) => s.distortion)
   const reverbMix = useAudioStore((s) => s.reverbMix)
+  const performanceMode = useUIStore((s) => s.performanceMode)
 
   // ── Internal refs ──
   const energyRef = useRef(0)
@@ -91,8 +93,9 @@ export function useHandSynth({ audio, hand, simClickQueueRef }: UseHandSynthPara
   // ── Main per-frame callback (called from QuantumCanvas every frame) ──
   const handleEnergyChange = useCallback((energy: number, interferenceRatio: number, mouseX: number, mouseY: number) => {
     energyRef.current = energy
-    const now = Date.now()
-    if (now - lastUpdateRef.current > 100) {
+    const now = performance.now()
+    const displayIntervalMs = performanceMode ? 200 : 100
+    if (now - lastUpdateRef.current > displayIntervalMs) {
       lastUpdateRef.current = now
       setEnergyDisplay(energy)
     }
@@ -109,6 +112,7 @@ export function useHandSynth({ audio, hand, simClickQueueRef }: UseHandSynthPara
 
     if (useHand) {
       const primary = leftH.detected ? leftH : rightH
+      const dualCfg = hand.getDualConfig()
 
       // Universal per-hand target routing
       const applyHandTarget = (target: string, value: number) => {
@@ -134,7 +138,6 @@ export function useHandSynth({ audio, hand, simClickQueueRef }: UseHandSynthPara
         const hs = which === 'left' ? leftH : rightH
         if (!hs.detected) continue
         for (const axis of ['x', 'y', 'z'] as const) {
-          const dualCfg = hand.getDualConfig()
           const target = dualCfg[which][`${axis}Target`]
           if (target === 'none') continue
           const val = axis === 'x' ? hs.x : axis === 'y' ? hs.y : hs.z
@@ -189,7 +192,9 @@ export function useHandSynth({ audio, hand, simClickQueueRef }: UseHandSynthPara
       }
     }
 
-    audio.update(energy, tuning.ripThreshold, interferenceRatio, synthX, synthY)
+    if (audioEnabled) {
+      audio.update(energy, tuning.ripThreshold, interferenceRatio, synthX, synthY)
+    }
 
     // Two-hand split — each hand triggers independent notes
     if (useHand && audioEnabled) {
@@ -245,7 +250,7 @@ export function useHandSynth({ audio, hand, simClickQueueRef }: UseHandSynthPara
     }
 
     // FFT → Wave Spawning
-    if (fftSpawnEnabled && audioEnabled) {
+    if (!performanceMode && fftSpawnEnabled && audioEnabled) {
       const bass = audio.fftRef.current.bass
       if (bass > fftSpawnThreshold && now - fftSpawnCooldownRef.current > fftSpawnRate) {
         fftSpawnCooldownRef.current = now
@@ -256,7 +261,7 @@ export function useHandSynth({ audio, hand, simClickQueueRef }: UseHandSynthPara
         audio.playNote(freq, 0.3)
       }
     }
-  }, [audio, fftSpawnEnabled, fftSpawnThreshold, fftSpawnRate, audioEnabled, synthScale, distortion, reverbMix, patchTuning, hand, midiEnabled, looperRecording])
+  }, [audio, fftSpawnEnabled, fftSpawnThreshold, fftSpawnRate, audioEnabled, synthScale, distortion, reverbMix, patchTuning, hand, midiEnabled, looperRecording, simClickQueueRef, performanceMode])
 
   return {
     handleEnergyChange,
