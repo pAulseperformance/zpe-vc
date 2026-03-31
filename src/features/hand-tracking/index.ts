@@ -1,4 +1,5 @@
 export { useHandTracker } from './ui/useHandTracker'
+export { useHandSynth } from './ui/use-hand-synth'
 export { NoteOverlay } from './ui/NoteOverlay'
 export { Looper } from './lib/looper'
 export { MidiOutput } from './lib/midi-output'

@@ -17,5 +17,14 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application"
-  }
+  },
+  "ai": {
+    "binding": "AI"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "FORGE_LOG",
+      "id": "cd612b74d74c4e2dbc6ca71d91862629"
+    }
+  ]
 }

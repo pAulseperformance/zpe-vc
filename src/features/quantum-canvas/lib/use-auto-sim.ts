@@ -25,11 +25,15 @@ export function useAutoSim(callbacks: AutoSimCallbacks) {
   const [simMouseRadius, setSimMouseRadius] = useState(0.15)
 
   const callbacksRef = useRef(callbacks)
-  callbacksRef.current = callbacks
+  useEffect(() => {
+    callbacksRef.current = callbacks
+  }, [callbacks])
 
   // Refs to avoid tearing down the loop when slider changes
   const simStateRef = useRef({ simMode, simSeparation, simRate, simMouseSpeed, simMouseRadius, simClicksOn, simMouseOn, simActive })
-  simStateRef.current = { simMode, simSeparation, simRate, simMouseSpeed, simMouseRadius, simClicksOn, simMouseOn, simActive }
+  useEffect(() => {
+    simStateRef.current = { simMode, simSeparation, simRate, simMouseSpeed, simMouseRadius, simClicksOn, simMouseOn, simActive }
+  }, [simMode, simSeparation, simRate, simMouseSpeed, simMouseRadius, simClicksOn, simMouseOn, simActive])
   
   // Physics state for gravity mode
   const gravStateRef = useRef({
@@ -41,6 +45,25 @@ export function useAutoSim(callbacks: AutoSimCallbacks) {
   
   // Unified Simulation Loop
   useEffect(() => {
+    const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v))
+
+    const computeRandomPoint = (seconds: number, speed: number) => {
+      const t = seconds * speed
+      const x = 0.5 + Math.sin(t * 0.7) * 0.15 + Math.sin(t * 1.3) * 0.08 + Math.sin(t * 2.9) * 0.04
+      const y = 0.5 + Math.cos(t * 0.5) * 0.15 + Math.cos(t * 1.7) * 0.08 + Math.cos(t * 3.1) * 0.04
+      return { x: clamp(x, 0.05, 0.95), y: clamp(y, 0.05, 0.95) }
+    }
+
+    const computeSpiralPoint = (seconds: number, speed: number, radius: number) => {
+      const t = seconds * speed
+      const cycle = t % 8
+      const r = (cycle / 8) * radius * 2
+      const theta = cycle * 3
+      const x = 0.5 + Math.cos(theta) * r
+      const y = 0.5 + Math.sin(theta) * r
+      return { x: clamp(x, 0.02, 0.98), y: clamp(y, 0.02, 0.98) }
+    }
+
     callbacksRef.current.onSimMouseActiveChange(simActive && simMouseOn)
     
     if (!simActive) return
@@ -68,6 +91,7 @@ export function useAutoSim(callbacks: AutoSimCallbacks) {
       const dt = Math.min(deltaMs * 0.001, 0.05) // dt in seconds, capped at 50ms
       lastTime = time
       elapsedClick += deltaMs
+      const seconds = time * 0.001
       
       const st = simStateRef.current
       const grav = gravStateRef.current
@@ -113,22 +137,15 @@ export function useAutoSim(callbacks: AutoSimCallbacks) {
           onSimMouseUpdate(grav.mousePos.x, grav.mousePos.y)
         } else if (st.simMode === 'random') {
           // Organic random walk using layered sine waves (poor man's Perlin)
-          const t = Date.now() * 0.001 * st.simMouseSpeed
-          const x = 0.5 + Math.sin(t * 0.7) * 0.15 + Math.sin(t * 1.3) * 0.08 + Math.sin(t * 2.9) * 0.04
-          const y = 0.5 + Math.cos(t * 0.5) * 0.15 + Math.cos(t * 1.7) * 0.08 + Math.cos(t * 3.1) * 0.04
-          onSimMouseUpdate(Math.max(0.05, Math.min(0.95, x)), Math.max(0.05, Math.min(0.95, y)))
+          const p = computeRandomPoint(seconds, st.simMouseSpeed)
+          onSimMouseUpdate(p.x, p.y)
         } else if (st.simMode === 'spiral') {
           // Archimedean spiral expanding outward then snapping back
-          const t = Date.now() * 0.001 * st.simMouseSpeed
-          const cycle = t % 8 // 8-second cycle
-          const r = (cycle / 8) * st.simMouseRadius * 2
-          const theta = cycle * 3 // 3 radians per second
-          const x = 0.5 + Math.cos(theta) * r
-          const y = 0.5 + Math.sin(theta) * r
-          onSimMouseUpdate(Math.max(0.02, Math.min(0.98, x)), Math.max(0.02, Math.min(0.98, y)))
+          const p = computeSpiralPoint(seconds, st.simMouseSpeed, st.simMouseRadius)
+          onSimMouseUpdate(p.x, p.y)
         } else {
           // Lissajous
-          const t = Date.now() * 0.001 * st.simMouseSpeed
+          const t = seconds * st.simMouseSpeed
           const x = 0.5 + Math.sin(t) * st.simMouseRadius
           const y = 0.5 + Math.sin(t * 2) * st.simMouseRadius * 0.7
           onSimMouseUpdate(x, y)
@@ -185,25 +202,18 @@ export function useAutoSim(callbacks: AutoSimCallbacks) {
           } else if (st.simMode === 'cluster') {
             // Hexagon cluster
             for (let i = 0; i < 6; i++) {
-              const angle = (i / 6) * Math.PI * 2 + (Date.now() * 0.001) // Rotate over time
+              const angle = (i / 6) * Math.PI * 2 + seconds // Rotate over time
               onSimClick(0.5 + Math.cos(angle) * st.simSeparation, 0.5 + Math.sin(angle) * st.simSeparation)
             }
           } else if (st.simMode === 'gravity') {
             onSimClick(grav.clickPos.x, grav.clickPos.y)
           } else if (st.simMode === 'random') {
             // Click at the wandering mouse position
-            const t = Date.now() * 0.001 * st.simMouseSpeed
-            const x = 0.5 + Math.sin(t * 0.7) * 0.15 + Math.sin(t * 1.3) * 0.08 + Math.sin(t * 2.9) * 0.04
-            const y = 0.5 + Math.cos(t * 0.5) * 0.15 + Math.cos(t * 1.7) * 0.08 + Math.cos(t * 3.1) * 0.04
-            onSimClick(Math.max(0.05, Math.min(0.95, x)), Math.max(0.05, Math.min(0.95, y)))
+            const p = computeRandomPoint(seconds, st.simMouseSpeed)
+            onSimClick(p.x, p.y)
           } else if (st.simMode === 'spiral') {
-            const t = Date.now() * 0.001 * st.simMouseSpeed
-            const cycle = t % 8
-            const r = (cycle / 8) * st.simMouseRadius * 2
-            const theta = cycle * 3
-            const x = 0.5 + Math.cos(theta) * r
-            const y = 0.5 + Math.sin(theta) * r
-            onSimClick(Math.max(0.02, Math.min(0.98, x)), Math.max(0.02, Math.min(0.98, y)))
+            const p = computeSpiralPoint(seconds, st.simMouseSpeed, st.simMouseRadius)
+            onSimClick(p.x, p.y)
           }
         }
       }
@@ -213,7 +223,7 @@ export function useAutoSim(callbacks: AutoSimCallbacks) {
     
     frameId = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(frameId)
-  }, [simActive, simClicksOn, simMouseOn])
+  }, [simActive, simClicksOn, simMouseOn, simMode])
 
   return {
     simActive, setSimActive,

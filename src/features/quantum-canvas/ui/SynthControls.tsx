@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import type { MutableRefObject } from 'react'
 import type { SynthWaveform, FFTBands, ScaleName } from '@/features/quantum-audio'
 
@@ -53,7 +54,42 @@ export function SynthControls({
   notesVolume, onNotesVolumeChange,
   fftRef,
 }: SynthControlsProps) {
-  const bands = fftRef.current
+  const [bands, setBands] = useState<FFTBands>({ bass: 0, mid: 0, treble: 0 })
+
+  useEffect(() => {
+    let frameId = 0
+    let lastSampleTime = 0
+    let lastBass = -1
+    let lastMid = -1
+    let lastTreble = -1
+    const SAMPLE_MS = 66
+    const EPSILON = 0.015
+
+    const syncBands = () => {
+      const now = performance.now()
+      if (now - lastSampleTime >= SAMPLE_MS) {
+        const next = fftRef.current
+        const b = next.bass
+        const m = next.mid
+        const t = next.treble
+
+        if (
+          Math.abs(b - lastBass) > EPSILON ||
+          Math.abs(m - lastMid) > EPSILON ||
+          Math.abs(t - lastTreble) > EPSILON
+        ) {
+          lastBass = b
+          lastMid = m
+          lastTreble = t
+          setBands({ bass: b, mid: m, treble: t })
+        }
+        lastSampleTime = now
+      }
+      frameId = requestAnimationFrame(syncBands)
+    }
+    frameId = requestAnimationFrame(syncBands)
+    return () => cancelAnimationFrame(frameId)
+  }, [fftRef])
 
   return (
     <div className="mt-3 pt-3 border-t border-cold-white-dim/10">

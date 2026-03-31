@@ -9,7 +9,7 @@ function SparkleParticles() {
       x: Math.cos(angle) * radius,
       y: Math.sin(angle) * radius,
       delay: i * 0.06,
-      size: 2 + Math.random() * 2,
+      size: 2 + ((i * 7) % 3),
     }
   })
 

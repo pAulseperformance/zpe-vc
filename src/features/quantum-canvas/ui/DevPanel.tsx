@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react'
 import type { MutableRefObject } from 'react'
-import { HAND_TARGET_LIST, HAND_TARGET_LABELS } from '@/features/hand-tracking'
 import type { HandTarget } from '@/features/hand-tracking'
 import { useAutoSim } from '../lib/use-auto-sim'
-import { MOUSE_SLIDERS, OBJECT_SLIDERS, UNIVERSE_SLIDERS, DEFAULT_TUNING } from '../lib/shader-tuning'
+import { DEFAULT_TUNING } from '../lib/shader-tuning'
 import type { ShaderTuning } from '../lib/shader-tuning'
 import { PresetControls } from './PresetControls'
 import { AutoSimControls } from './AutoSimControls'
@@ -12,7 +11,8 @@ import { ExportControls } from './ExportControls'
 import { SynthControls } from './SynthControls'
 import { FXControls } from './FXControls'
 import { EnvelopeControls } from './EnvelopeControls'
-import { SliderGroup } from './SliderGroup'
+import { HandTrackingPanel } from './HandTrackingPanel'
+import { TuningSliders } from './TuningSliders'
 import type { FFTBands } from '@/features/quantum-audio'
 import { useTuningStore } from '../model/tuning-store'
 import { useAudioStore } from '@/features/quantum-audio/model/audio-store'
@@ -28,17 +28,11 @@ interface DevPanelProps {
   onSimClick: (x: number, y: number) => void
   wallRip: boolean
   onWallRipChange: (value: boolean) => void
-  simMouseActive: boolean
   onSimMouseActiveChange: (value: boolean) => void
   onSimMouseUpdate: (x: number, y: number) => void
-  gravBodyPositions: MutableRefObject<{click: {x: number, y: number}, mouse: {x: number, y: number}} | null>
+  gravBodyPositionsRef: MutableRefObject<{click: {x: number, y: number}, mouse: {x: number, y: number}} | null>
   canvasRef: MutableRefObject<HTMLCanvasElement | null>
   fftRef: MutableRefObject<FFTBands>
-  audio: {
-    playNote: (freq: number, vel: number, sustained?: boolean) => { release: () => void; bend: (f: number) => void }
-    getRecordingStream: () => MediaStream | null
-  }
-  // Hand tracking (still prop-drilled from App — deeply ref-coupled)
   handTracking: {
     active: boolean
     loading: boolean
@@ -73,7 +67,7 @@ interface DevPanelProps {
   }
 }
 
-export function DevPanel({ energy, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, simMouseActive: _simMouseActive, onSimMouseActiveChange, onSimMouseUpdate, gravBodyPositions, canvasRef, fftRef, audio: _audio, handTracking, performance }: DevPanelProps) {
+export function DevPanel({ energy, energyOverride, onEnergyOverride, onSimClick, wallRip, onWallRipChange, onSimMouseActiveChange, onSimMouseUpdate, gravBodyPositionsRef, canvasRef, fftRef, handTracking, performance }: DevPanelProps) {
   // ── Read from stores ──
   const tuning = useTuningStore((s) => s.tuning)
   const setTuning = useTuningStore((s) => s.setTuning)
@@ -137,20 +131,30 @@ export function DevPanel({ energy, energyOverride, onEnergyOverride, onSimClick,
   // Bridge gravity body positions to parent for adaptive zoom
   useEffect(() => {
     if (sim.simMode === 'gravity' && sim.simActive) {
-      const interval = setInterval(() => {
-        gravBodyPositions.current = {
-          click: { ...sim.gravState.current.clickPos },
-          mouse: { ...sim.gravState.current.mousePos },
-        }
-      }, 16)
+      const bridge = {
+        click: { x: sim.gravState.current.clickPos.x, y: sim.gravState.current.clickPos.y },
+        mouse: { x: sim.gravState.current.mousePos.x, y: sim.gravState.current.mousePos.y },
+      }
+      gravBodyPositionsRef.current = bridge
+
+      let frameId = 0
+      const sync = () => {
+        bridge.click.x = sim.gravState.current.clickPos.x
+        bridge.click.y = sim.gravState.current.clickPos.y
+        bridge.mouse.x = sim.gravState.current.mousePos.x
+        bridge.mouse.y = sim.gravState.current.mousePos.y
+        frameId = requestAnimationFrame(sync)
+      }
+      frameId = requestAnimationFrame(sync)
+
       return () => {
-        clearInterval(interval)
-        gravBodyPositions.current = null
+        cancelAnimationFrame(frameId)
+        gravBodyPositionsRef.current = null
       }
     } else {
-      gravBodyPositions.current = null
+      gravBodyPositionsRef.current = null
     }
-  }, [sim.simMode, sim.simActive, sim.gravState, gravBodyPositions])
+  }, [sim.simMode, sim.simActive, sim.gravState, gravBodyPositionsRef])
 
   const handleChange = (key: keyof ShaderTuning, value: number | boolean) => {
     setTuning({ ...tuning, [key]: value } as ShaderTuning)
@@ -176,43 +180,12 @@ export function DevPanel({ energy, energyOverride, onEnergyOverride, onSimClick,
         onAudioToggle={setAudioEnabled}
         onCopy={(btn) => {
           const og = btn.innerText
-          // Full snapshot: shader tuning + all synth/FX state from stores
           const audioState = useAudioStore.getState()
-          const fullState = {
-            ...tuning,
-            audioEnabled: audioState.audioEnabled,
-            masterVolume: audioState.masterVolume,
-            droneVolume: audioState.droneVolume,
-            notesVolume: audioState.notesVolume,
-            synthWaveform: audioState.synthWaveform,
-            synthFilterQ: audioState.synthFilterQ,
-            audioReactive: audioState.audioReactive,
-            synthScale: audioState.synthScale,
-            unisonCount: audioState.unisonCount,
-            detuneSpread: audioState.detuneSpread,
-            delayTime: audioState.delayTime,
-            delayFeedback: audioState.delayFeedback,
-            delayMix: audioState.delayMix,
-            reverbMix: audioState.reverbMix,
-            reverbDecay: audioState.reverbDecay,
-            distortion: audioState.distortion,
-            autoDistortion: audioState.autoDistortion,
-            fftSpawnEnabled: audioState.fftSpawnEnabled,
-            fftSpawnThreshold: audioState.fftSpawnThreshold,
-            fftSpawnRate: audioState.fftSpawnRate,
-            envAttack: audioState.envAttack,
-            envDecay: audioState.envDecay,
-            envSustain: audioState.envSustain,
-            envRelease: audioState.envRelease,
-            hideCursor,
-          }
+          const fullState = { ...tuning, ...audioState, hideCursor }
           navigator.clipboard.writeText(JSON.stringify(fullState, null, 2))
           btn.innerText = 'COPIED'
           btn.classList.add('text-electric-purple')
-          setTimeout(() => {
-            btn.innerText = og
-            btn.classList.remove('text-electric-purple')
-          }, 1000)
+          setTimeout(() => { btn.innerText = og; btn.classList.remove('text-electric-purple') }, 1000)
         }}
         onReset={() => {
           setTuning({ ...DEFAULT_TUNING })
@@ -228,24 +201,15 @@ export function DevPanel({ energy, energyOverride, onEnergyOverride, onSimClick,
       {audioEnabled && (
         <>
         <SynthControls
-          waveform={synthWaveform}
-          onWaveformChange={setSynthWaveform}
-          filterQ={synthFilterQ}
-          onFilterQChange={setSynthFilterQ}
-          audioReactive={audioReactive}
-          onAudioReactiveChange={setAudioReactive}
-          scale={synthScale}
-          onScaleChange={setSynthScale}
-          unisonCount={unisonCount}
-          onUnisonCountChange={setUnisonCount}
-          detuneSpread={detuneSpread}
-          onDetuneSpreadChange={setDetuneSpread}
-          volume={masterVolume}
-          onVolumeChange={setMasterVolume}
-          droneVolume={droneVolume}
-          onDroneVolumeChange={setDroneVolume}
-          notesVolume={notesVolume}
-          onNotesVolumeChange={setNotesVolume}
+          waveform={synthWaveform} onWaveformChange={setSynthWaveform}
+          filterQ={synthFilterQ} onFilterQChange={setSynthFilterQ}
+          audioReactive={audioReactive} onAudioReactiveChange={setAudioReactive}
+          scale={synthScale} onScaleChange={setSynthScale}
+          unisonCount={unisonCount} onUnisonCountChange={setUnisonCount}
+          detuneSpread={detuneSpread} onDetuneSpreadChange={setDetuneSpread}
+          volume={masterVolume} onVolumeChange={setMasterVolume}
+          droneVolume={droneVolume} onDroneVolumeChange={setDroneVolume}
+          notesVolume={notesVolume} onNotesVolumeChange={setNotesVolume}
           fftRef={fftRef}
         />
         <FXControls
@@ -257,41 +221,11 @@ export function DevPanel({ energy, energyOverride, onEnergyOverride, onSimClick,
           distortion={distortion} onDistortionChange={setDistortion}
           autoDistortion={autoDistortion} onAutoDistortionChange={setAutoDistortion}
         />
-        {/* Feedback Loop */}
-        <div className="mt-3 pt-3 border-t border-cold-white-dim/10">
-          <span className="text-[0.6rem] text-electric-purple/60 tracking-wider uppercase">Feedback</span>
-          <div className="flex items-center gap-2 mt-1.5">
-            <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Bass→Wave</span>
-            <button
-              onClick={() => setFftSpawnEnabled(!fftSpawnEnabled)}
-              className={`text-[0.55rem] px-2 py-0.5 rounded border transition-colors ${
-                fftSpawnEnabled
-                  ? 'text-electric-purple border-electric-purple/40 bg-electric-purple/10'
-                  : 'text-cold-white-dim/40 border-cold-white-dim/10'
-              }`}
-            >
-              {fftSpawnEnabled ? '⚡ ON' : '⏸ OFF'}
-            </button>
-          </div>
-          {fftSpawnEnabled && (
-            <>
-              <div className="flex items-center gap-2 mt-1.5">
-                <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Thresh</span>
-                <input type="range" min={0.1} max={0.9} step={0.05} value={fftSpawnThreshold}
-                  onChange={e => setFftSpawnThreshold(Number(e.target.value))}
-                  className="flex-1 h-1 accent-electric-purple" />
-                <span className="text-[0.55rem] w-8 text-right">{(fftSpawnThreshold * 100).toFixed(0)}%</span>
-              </div>
-              <div className="flex items-center gap-2 mt-1.5">
-                <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Rate</span>
-                <input type="range" min={50} max={500} step={25} value={fftSpawnRate}
-                  onChange={e => setFftSpawnRate(Number(e.target.value))}
-                  className="flex-1 h-1 accent-electric-purple" />
-                <span className="text-[0.55rem] w-10 text-right">{fftSpawnRate}ms</span>
-              </div>
-            </>
-          )}
-        </div>
+        <FeedbackControls
+          fftSpawnEnabled={fftSpawnEnabled} onToggle={() => setFftSpawnEnabled(!fftSpawnEnabled)}
+          fftSpawnThreshold={fftSpawnThreshold} onThresholdChange={setFftSpawnThreshold}
+          fftSpawnRate={fftSpawnRate} onRateChange={setFftSpawnRate}
+        />
         <EnvelopeControls
           attack={envAttack} onAttackChange={setEnvAttack}
           decay={envDecay} onDecayChange={setEnvDecay}
@@ -301,242 +235,24 @@ export function DevPanel({ energy, energyOverride, onEnergyOverride, onSimClick,
         </>
       )}
 
-      {/* Hand Tracking Controls */}
-      <div className="mt-3 pt-3 border-t border-cold-white-dim/10">
-        <div className="flex items-center justify-between">
-          <span className="text-[0.6rem] text-electric-purple/60 tracking-wider uppercase">🖐 Hand Tracking</span>
-          <button
-            onClick={handTracking.toggle}
-            disabled={handTracking.loading}
-            className={`text-[0.55rem] px-2 py-0.5 rounded border transition-colors ${
-              handTracking.loading
-                ? 'border-yellow-400/30 text-yellow-400 animate-pulse'
-                : handTracking.active
-                  ? 'border-green-400/40 bg-green-400/10 text-green-400'
-                  : 'border-cold-white-dim/20 text-cold-white-dim/50 hover:border-electric-purple/30'
-            }`}
-          >
-            {handTracking.loading ? '⏳ Loading...' : handTracking.active ? '🟢 Active' : '📷 Enable'}
-          </button>
-        </div>
-
-        {handTracking.active && (() => {
-          const dualCfg = handTracking.getDualConfig()
-          const cfg = handTracking.getConfig()
-          const hs = handTracking.handState
-          return (
-            <div className="mt-2 space-y-1.5">
-              {/* Live status */}
-              <div className="flex items-center gap-2 text-[0.5rem] text-cold-white-dim/40 flex-wrap">
-                <span>L: <span className={handTracking.dualState.left.detected ? 'text-green-400' : 'text-red-400/40'}>{handTracking.dualState.left.detected ? handTracking.dualState.left.gesture ?? '✋' : '—'}</span></span>
-                <span>R: <span className={handTracking.dualState.right.detected ? 'text-cyan-400' : 'text-red-400/40'}>{handTracking.dualState.right.detected ? handTracking.dualState.right.gesture ?? '✋' : '—'}</span></span>
-                <span>{hs.pinching ? '🤏' : ''}</span>
-                <span className="text-cold-white-dim/20">{(hs.confidence * 100).toFixed(0)}%</span>
-              </div>
-
-              {/* Per-hand axis mapping */}
-              {(['left', 'right'] as const).map((hand) => (
-                <div key={hand} className="space-y-0.5">
-                  <span className={`text-[0.5rem] font-bold ${hand === 'left' ? 'text-green-400/60' : 'text-cyan-400/60'}`}>
-                    {hand === 'left' ? '🫲 Left' : '🫱 Right'}
-                  </span>
-                  {(['x', 'y', 'z'] as const).map((axis) => (
-                    <div key={axis} className="flex items-center gap-2">
-                      <span className="text-[0.5rem] text-cold-white-dim/40 w-5 uppercase">{axis}</span>
-                      <select
-                        value={dualCfg[hand][`${axis}Target`]}
-                        onChange={e => handTracking.setHandMapping(hand, axis, e.target.value as HandTarget)}
-                        className="flex-1 bg-black/60 border border-cold-white-dim/15 rounded text-[0.5rem] text-cold-white-dim px-1 py-0.5"
-                      >
-                        {HAND_TARGET_LIST.map(t => <option key={t} value={t}>{HAND_TARGET_LABELS[t]}</option>)}
-                      </select>
-                    </div>
-                  ))}
-                </div>
-              ))}
-
-              {/* Smoothing */}
-              <div className="flex items-center gap-2">
-                <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Smooth</span>
-                <input type="range" min={0} max={0.95} step={0.05} value={cfg.smoothing}
-                  onChange={e => handTracking.setSmoothing(Number(e.target.value))}
-                  className="flex-1 h-1 accent-electric-purple" />
-                <span className="text-[0.55rem] w-8 text-right">{(cfg.smoothing * 100).toFixed(0)}%</span>
-              </div>
-
-              {/* Pinch threshold */}
-              <div className="flex items-center gap-2">
-                <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Pinch</span>
-                <input type="range" min={0.02} max={0.15} step={0.005} value={cfg.pinchThreshold}
-                  onChange={e => handTracking.setPinchThreshold(Number(e.target.value))}
-                  className="flex-1 h-1 accent-electric-purple" />
-                <span className="text-[0.55rem] w-8 text-right">{(cfg.pinchThreshold * 100).toFixed(0)}</span>
-              </div>
-
-              {/* Looper controls */}
-              {handTracking.looper && (
-                <div className="flex items-center gap-1.5 mt-1">
-                  <button
-                    onClick={handTracking.looper.onRecord}
-                    className={`px-2 py-0.5 rounded text-[0.55rem] font-bold transition-colors ${
-                      handTracking.looper.recording
-                        ? 'bg-red-500/30 text-red-400 border border-red-500/50 animate-pulse'
-                        : 'bg-white/5 text-cold-white-dim/50 border border-white/10 hover:bg-white/10'
-                    }`}
-                  >
-                    {handTracking.looper.recording ? '⏹ Stop' : '⏺ Rec'}
-                  </button>
-                  <button
-                    onClick={handTracking.looper.onPlay}
-                    disabled={handTracking.looper.eventCount === 0}
-                    className={`px-2 py-0.5 rounded text-[0.55rem] font-bold transition-colors ${
-                      handTracking.looper.playing
-                        ? 'bg-green-500/30 text-green-400 border border-green-500/50'
-                        : 'bg-white/5 text-cold-white-dim/50 border border-white/10 hover:bg-white/10'
-                    } disabled:opacity-30`}
-                  >
-                    {handTracking.looper.playing ? '⏹ Stop' : '▶ Play'}
-                  </button>
-                  <button
-                    onClick={handTracking.looper.onClear}
-                    className="px-2 py-0.5 rounded text-[0.55rem] bg-white/5 text-cold-white-dim/50 border border-white/10 hover:bg-white/10"
-                  >
-                    ✕
-                  </button>
-                  {handTracking.looper.eventCount > 0 && (
-                    <span className="text-[0.5rem] text-cold-white-dim/30">{handTracking.looper.eventCount} events</span>
-                  )}
-                </div>
-              )}
-              {/* Performance controls */}
-              {performance && (
-                <div className="flex items-center gap-1.5 mt-1">
-                  <button
-                    onClick={performance.onMidiToggle}
-                    className={`px-2 py-0.5 rounded text-[0.55rem] font-bold transition-colors ${
-                      performance.midiEnabled
-                        ? 'bg-blue-500/30 text-blue-400 border border-blue-500/50'
-                        : 'bg-white/5 text-cold-white-dim/50 border border-white/10 hover:bg-white/10'
-                    }`}
-                  >
-                    🎹 MIDI
-                  </button>
-                  <button
-                    onClick={performance.onRecordToggle}
-                    className={`px-2 py-0.5 rounded text-[0.55rem] font-bold transition-colors ${
-                      performance.isRecording
-                        ? 'bg-red-500/30 text-red-400 border border-red-500/50 animate-pulse'
-                        : 'bg-white/5 text-cold-white-dim/50 border border-white/10 hover:bg-white/10'
-                    }`}
-                  >
-                    {performance.isRecording ? '⏹ REC' : '🎙 REC'}
-                  </button>
-                  <button
-                    onClick={performance.onPerformanceToggle}
-                    className={`px-2 py-0.5 rounded text-[0.55rem] font-bold transition-colors ${
-                      performance.performanceMode
-                        ? 'bg-purple-500/30 text-purple-400 border border-purple-500/50'
-                        : 'bg-white/5 text-cold-white-dim/50 border border-white/10 hover:bg-white/10'
-                    }`}
-                  >
-                    🎭 Perform
-                  </button>
-                </div>
-              )}
-            </div>
-          )
-        })()}
-      </div>
+      <HandTrackingPanel handTracking={handTracking} performance={performance} />
 
       <EnergyMeter
-        energy={energy}
-        energyOverride={energyOverride}
-        onEnergyOverride={onEnergyOverride}
-        ripThreshold={tuning.ripThreshold}
-        wallRip={wallRip}
-        onWallRipChange={onWallRipChange}
+        energy={energy} energyOverride={energyOverride} onEnergyOverride={onEnergyOverride}
+        ripThreshold={tuning.ripThreshold} wallRip={wallRip} onWallRipChange={onWallRipChange}
       />
 
-      <PaletteModeToggle tuning={tuning} onChange={setTuning} />
-      <WavelengthBandSelector tuning={tuning} onChange={setTuning} />
-
-      {/* God Mode & Pointer Hover Toggles */}
-      <div className="flex gap-2 mb-2 w-full">
-        <button 
-          onClick={() => handleChange('godMode', !tuning.godMode)}
-          className={`flex-1 text-[0.6rem] uppercase tracking-wider border px-2 py-1 rounded transition-colors ${tuning.godMode ? 'border-electric-purple bg-electric-purple/20 text-electric-purple shadow-[0_0_10px_rgba(155,81,224,0.3)]' : 'border-cold-white-dim/20 text-cold-white-dim/50 hover:border-cold-white-dim/40'}`}
-        >
-          ⚡ God Mode
-        </button>
-        <button 
-          onClick={() => setHideCursor(!hideCursor)}
-          className={`flex-1 text-[0.6rem] uppercase tracking-wider border px-2 py-1 rounded transition-colors ${hideCursor ? 'border-red-400/50 bg-red-400/10 text-red-400' : 'border-cold-white-dim/20 text-cold-white-dim/50 hover:border-cold-white-dim/40'}`}
-        >
-          {hideCursor ? '🚫 Cursor Off' : '🖱 Cursor On'}
-        </button>
-      </div>
-
-
-
-        {/* Mouse / God Object */}
-        <div className="text-[0.55rem] text-electric-purple/50 uppercase tracking-widest mt-1 mb-0.5 border-b border-electric-purple/10 pb-0.5">🖱 Mouse (God Object)</div>
-        <button 
-          onClick={() => handleChange('pointerHover', !tuning.pointerHover)}
-          className={`text-[0.55rem] w-full text-left px-1 py-0.5 rounded border mb-1 transition-colors ${tuning.pointerHover ? 'border-electric-purple/30 text-electric-purple bg-electric-purple/10' : 'border-cold-white-dim/10 text-cold-white-dim/30'}`}
-        >
-          {tuning.pointerHover ? '☑ Hover Warp Active' : '☐ Hover Warp Disabled'}
-        </button>
-        <SliderGroup sliders={MOUSE_SLIDERS} tuning={tuning} onChange={handleChange} />
-
-        {/* Click Object */}
-        <div className="text-[0.55rem] text-electric-purple/50 uppercase tracking-widest mt-2 mb-0.5 border-b border-electric-purple/10 pb-0.5">💥 Click Object (EM Waves)</div>
-        <SliderGroup sliders={OBJECT_SLIDERS} tuning={tuning} onChange={handleChange} />
-
-        {/* Universe */}
-        <div className="text-[0.55rem] text-electric-purple/50 uppercase tracking-widest mt-2 mb-0.5 border-b border-electric-purple/10 pb-0.5">🌌 Universe</div>
-        <SliderGroup sliders={UNIVERSE_SLIDERS} tuning={tuning} onChange={handleChange} />
-
-        {/* Zoom Mode Toggle */}
-        <div className="flex items-center gap-2 mt-1">
-          <span className="text-[0.55rem] text-cold-white-dim/40 w-14 shrink-0">Zoom</span>
-          <button
-            onClick={() => {
-              const next = ((tuning.zoomMode ?? 0) + 1) % 3
-              setTuning({ ...tuning, zoomMode: next })
-            }}
-            className="text-[0.55rem] text-cold-white-dim/50 hover:text-electric-purple border border-cold-white-dim/10 rounded px-2 py-0.5"
-          >
-            {(tuning.zoomMode ?? 0) === 0 ? '🔧 Manual' : (tuning.zoomMode ?? 0) === 1 ? '🔭 Adaptive' : '🔭 Adaptive + Walls'}
-          </button>
-        </div>
+      <TuningSliders tuning={tuning} onTuningChange={setTuning} onFieldChange={handleChange} />
 
       <PresetControls
         tuning={{
           ...tuning,
           ...(sim.simActive ? {
-            autoSim: {
-              active: sim.simActive,
-              mode: sim.simMode,
-              rate: sim.simRate,
-              clicksOn: sim.simClicksOn,
-              mouseOn: sim.simMouseOn,
-              separation: sim.simSeparation,
-              mouseSpeed: sim.simMouseSpeed,
-              mouseRadius: sim.simMouseRadius,
-            }
+            autoSim: { active: sim.simActive, mode: sim.simMode, rate: sim.simRate, clicksOn: sim.simClicksOn, mouseOn: sim.simMouseOn, separation: sim.simSeparation, mouseSpeed: sim.simMouseSpeed, mouseRadius: sim.simMouseRadius }
           } : {}),
-          ripBlocked: wallRip,
-          audioEnabled,
-          synthWaveform,
-          synthFilterQ,
-          audioReactive,
-          synthScale,
-          unisonCount,
-          detuneSpread,
-          delayTime, delayFeedback, delayMix,
-          reverbMix, reverbDecay,
-          distortion, autoDistortion,
-          hideCursor,
+          ripBlocked: wallRip, audioEnabled, synthWaveform, synthFilterQ, audioReactive, synthScale,
+          unisonCount, detuneSpread, delayTime, delayFeedback, delayMix, reverbMix, reverbDecay,
+          distortion, autoDistortion, hideCursor,
         }}
         onChange={(loadedTuning) => {
           setTuning(loadedTuning)
@@ -549,13 +265,8 @@ export function DevPanel({ energy, energyOverride, onEnergyOverride, onSimClick,
             sim.setSimSeparation(loadedTuning.autoSim.separation ?? 0.2)
             sim.setSimMouseSpeed(loadedTuning.autoSim.mouseSpeed ?? 0.5)
             sim.setSimMouseRadius(loadedTuning.autoSim.mouseRadius ?? 0.15)
-          } else {
-            sim.setSimActive(false)
-          }
-          if (loadedTuning.ripBlocked !== undefined) {
-            onWallRipChange(loadedTuning.ripBlocked)
-          }
-          // Hydrate audio store from loaded preset
+          } else { sim.setSimActive(false) }
+          if (loadedTuning.ripBlocked !== undefined) onWallRipChange(loadedTuning.ripBlocked)
           hydrateFromTuning(loadedTuning)
           if (loadedTuning.hideCursor !== undefined) setHideCursor(loadedTuning.hideCursor)
         }}
@@ -565,7 +276,6 @@ export function DevPanel({ energy, energyOverride, onEnergyOverride, onSimClick,
       <BarrierControls tuning={tuning} onChange={setTuning} />
       <AutoSimControls sim={sim} />
 
-      {/* Gravity body position indicators */}
       {sim.simMode === 'gravity' && sim.simActive && (
         <div className="mt-2 border-t border-cold-white-dim/10 pt-1.5">
           <span className="text-[0.55rem] text-cold-white-dim/30">Gravity Bodies: </span>
@@ -579,7 +289,7 @@ export function DevPanel({ energy, energyOverride, onEnergyOverride, onSimClick,
   )
 }
 
-/* ─── Inline sub-components (tightly coupled to DevPanel layout) ─── */
+/* ─── Inline sub-components ─── */
 
 function PanelHeader({ audioEnabled, onAudioToggle, onCopy, onReset, onCollapse }: {
   audioEnabled: boolean; onAudioToggle: (v: boolean) => void
@@ -589,21 +299,9 @@ function PanelHeader({ audioEnabled, onAudioToggle, onCopy, onReset, onCollapse 
     <div className="flex justify-between items-center mb-3">
       <span className="text-electric-purple tracking-wider uppercase text-[0.6rem]">⚙ Shader Tuning</span>
       <div className="flex gap-2">
-        <button
-          onClick={() => onAudioToggle(!audioEnabled)}
-          className={`text-[0.7rem] ${audioEnabled ? 'text-electric-purple' : 'text-cold-white-dim/40'} hover:text-electric-purple`}
-          title={audioEnabled ? 'Mute audio' : 'Enable audio feedback'}
-        >
-          {audioEnabled ? '🔊' : '🔇'}
-        </button>
-        <button
-          onClick={(e) => onCopy(e.currentTarget)}
-          className="text-cold-white-dim/40 hover:text-cold-white text-[0.6rem] uppercase transition-colors"
-          title="Copy settings to clipboard"
-        >
-          Copy JSON
-        </button>
-        <button onClick={onReset} className="text-cold-white-dim/40 hover:text-cold-white text-[0.6rem] uppercase transition-colors" title="Reset sliders to defaults (does not delete presets)">Reset</button>
+        <button onClick={() => onAudioToggle(!audioEnabled)} className={`text-[0.7rem] ${audioEnabled ? 'text-electric-purple' : 'text-cold-white-dim/40'} hover:text-electric-purple`} title={audioEnabled ? 'Mute audio' : 'Enable audio feedback'}>{audioEnabled ? '🔊' : '🔇'}</button>
+        <button onClick={(e) => onCopy(e.currentTarget)} className="text-cold-white-dim/40 hover:text-cold-white text-[0.6rem] uppercase transition-colors" title="Copy settings to clipboard">Copy JSON</button>
+        <button onClick={onReset} className="text-cold-white-dim/40 hover:text-cold-white text-[0.6rem] uppercase transition-colors" title="Reset sliders to defaults">Reset</button>
         <button onClick={onCollapse} className="text-cold-white-dim/40 hover:text-cold-white tracking-widest text-[0.55rem] uppercase border border-cold-white-dim/20 px-1.5 rounded" title="Hide panel">Hide</button>
       </div>
     </div>
@@ -617,38 +315,18 @@ function EnergyMeter({ energy, energyOverride, onEnergyOverride, ripThreshold, w
   return (
     <div className="mb-3">
       <div className="flex items-center gap-2">
-        <button
-          onClick={() => onEnergyOverride(energyOverride !== null ? null : energy)}
-          className={`text-[0.7rem] ${energyOverride !== null ? 'text-electric-purple' : 'text-cold-white-dim/40'} hover:text-electric-purple`}
-          title={energyOverride !== null ? 'Unlock energy' : 'Lock energy at current value'}
-        >
-          {energyOverride !== null ? '🔒' : '🔓'}
-        </button>
+        <button onClick={() => onEnergyOverride(energyOverride !== null ? null : energy)} className={`text-[0.7rem] ${energyOverride !== null ? 'text-electric-purple' : 'text-cold-white-dim/40'} hover:text-electric-purple`} title={energyOverride !== null ? 'Unlock energy' : 'Lock energy at current value'}>{energyOverride !== null ? '🔒' : '🔓'}</button>
         <span className="text-[0.6rem] text-cold-white-dim/40 w-12">ENERGY</span>
         <div className="flex-1 h-1.5 bg-cold-white-dim/10 rounded overflow-hidden">
-          <div
-            className="h-full bg-electric-purple transition-all duration-100"
-            style={{ width: `${Math.min(100, ((energyOverride ?? energy) / ripThreshold) * 100)}%` }}
-          />
+          <div className="h-full bg-electric-purple transition-all duration-100" style={{ width: `${Math.min(100, ((energyOverride ?? energy) / ripThreshold) * 100)}%` }} />
         </div>
         <span className="text-[0.6rem] w-8 text-right">{(energyOverride ?? energy).toFixed(0)}</span>
-        <button
-          onClick={() => onWallRipChange(!wallRip)}
-          className={`text-[0.6rem] ml-1 px-1.5 py-0.5 rounded border transition-colors ${wallRip ? 'text-red-400 border-red-400/50 bg-red-400/10 hover:bg-red-400/20' : 'text-yellow-400/80 border-yellow-400/30 hover:bg-yellow-400/10'}`}
-          title={wallRip ? 'Rip zone blocked — click to allow' : 'Rip zone open — click to block'}
-        >
-          {wallRip ? '🚫 BLOCKED' : '⚡ RIP ON'}
-        </button>
+        <button onClick={() => onWallRipChange(!wallRip)} className={`text-[0.6rem] ml-1 px-1.5 py-0.5 rounded border transition-colors ${wallRip ? 'text-red-400 border-red-400/50 bg-red-400/10 hover:bg-red-400/20' : 'text-yellow-400/80 border-yellow-400/30 hover:bg-yellow-400/10'}`} title={wallRip ? 'Rip zone blocked — click to allow' : 'Rip zone open — click to block'}>{wallRip ? '🚫 BLOCKED' : '⚡ RIP ON'}</button>
       </div>
       {energyOverride !== null && (
         <div className="flex items-center gap-2 mt-1">
           <span className="text-[0.55rem] text-electric-purple/60 w-16">Override</span>
-          <input
-            type="range" min={0} max={300} step={1}
-            value={energyOverride}
-            onChange={e => onEnergyOverride(Number(e.target.value))}
-            className="flex-1 h-1 accent-electric-purple"
-          />
+          <input type="range" min={0} max={300} step={1} value={energyOverride} onChange={e => onEnergyOverride(Number(e.target.value))} className="flex-1 h-1 accent-electric-purple" />
           <span className="text-[0.55rem] text-electric-purple w-8 text-right">{energyOverride.toFixed(0)}</span>
         </div>
       )}
@@ -656,60 +334,32 @@ function EnergyMeter({ energy, energyOverride, onEnergyOverride, ripThreshold, w
   )
 }
 
-function PaletteModeToggle({ tuning, onChange }: { tuning: ShaderTuning; onChange: (t: ShaderTuning) => void }) {
-  const modes = [
-    { mode: 0, label: '🔬 Physical', title: 'Planck blackbody + intensity-only interference' },
-    { mode: 1, label: '🎨 Artistic', title: 'Vibrant cosine palette + chromatic dispersion' },
-    { mode: 2, label: '⚗️ Hybrid', title: 'Blackbody thermal + artistic wavefronts' },
-  ] as const
-
+function FeedbackControls({ fftSpawnEnabled, onToggle, fftSpawnThreshold, onThresholdChange, fftSpawnRate, onRateChange }: {
+  fftSpawnEnabled: boolean; onToggle: () => void
+  fftSpawnThreshold: number; onThresholdChange: (v: number) => void
+  fftSpawnRate: number; onRateChange: (v: number) => void
+}) {
   return (
-    <div className="flex items-center gap-1.5 mb-2">
-      <span className="text-[0.55rem] text-cold-white-dim/40 w-14 shrink-0">Palette</span>
-      {modes.map(({ mode, label, title }) => (
-        <button
-          key={mode}
-          onClick={() => onChange({ ...tuning, paletteMode: mode })}
-          title={title}
-          className={`text-[0.5rem] px-1.5 py-0.5 rounded border ${
-            tuning.paletteMode === mode
-              ? 'text-electric-purple border-electric-purple/40 bg-electric-purple/10'
-              : 'text-cold-white-dim/30 border-cold-white-dim/10 hover:border-electric-purple/20'
-          }`}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-function WavelengthBandSelector({ tuning, onChange }: { tuning: ShaderTuning; onChange: (t: ShaderTuning) => void }) {
-  const bands = [
-    { mode: 0, label: '📻', title: 'Radio — long wavelength, low energy' },
-    { mode: 1, label: '🔴', title: 'Infrared — thermal emission' },
-    { mode: 2, label: '👁', title: 'Visible — default human perception' },
-    { mode: 3, label: '💎', title: 'X-Ray — high energy penetration' },
-    { mode: 4, label: '☢️', title: 'Gamma — extreme energy, pair production' },
-  ] as const
-
-  return (
-    <div className="flex items-center gap-1 mb-2 flex-wrap">
-      <span className="text-[0.55rem] text-cold-white-dim/40 w-14 shrink-0">Band</span>
-      {bands.map(({ mode, label, title }) => (
-        <button
-          key={mode}
-          onClick={() => onChange({ ...tuning, wavelength: mode })}
-          title={title}
-          className={`text-[0.6rem] px-1 py-0.5 rounded border ${
-            tuning.wavelength === mode
-              ? 'text-electric-purple border-electric-purple/40 bg-electric-purple/10'
-              : 'text-cold-white-dim/30 border-cold-white-dim/10 hover:border-electric-purple/20'
-          }`}
-        >
-          {label}
-        </button>
-      ))}
+    <div className="mt-3 pt-3 border-t border-cold-white-dim/10">
+      <span className="text-[0.6rem] text-electric-purple/60 tracking-wider uppercase">Feedback</span>
+      <div className="flex items-center gap-2 mt-1.5">
+        <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Bass→Wave</span>
+        <button onClick={onToggle} className={`text-[0.55rem] px-2 py-0.5 rounded border transition-colors ${fftSpawnEnabled ? 'text-electric-purple border-electric-purple/40 bg-electric-purple/10' : 'text-cold-white-dim/40 border-cold-white-dim/10'}`}>{fftSpawnEnabled ? '⚡ ON' : '⏸ OFF'}</button>
+      </div>
+      {fftSpawnEnabled && (
+        <>
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Thresh</span>
+            <input type="range" min={0.1} max={0.9} step={0.05} value={fftSpawnThreshold} onChange={e => onThresholdChange(Number(e.target.value))} className="flex-1 h-1 accent-electric-purple" />
+            <span className="text-[0.55rem] w-8 text-right">{(fftSpawnThreshold * 100).toFixed(0)}%</span>
+          </div>
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className="text-[0.55rem] text-cold-white-dim/40 w-14">Rate</span>
+            <input type="range" min={50} max={500} step={25} value={fftSpawnRate} onChange={e => onRateChange(Number(e.target.value))} className="flex-1 h-1 accent-electric-purple" />
+            <span className="text-[0.55rem] w-10 text-right">{fftSpawnRate}ms</span>
+          </div>
+        </>
+      )}
     </div>
   )
 }

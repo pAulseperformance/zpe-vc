@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import type { ShaderTuning } from '../lib/shader-tuning'
 import { BUILT_IN_PRESETS, DEFAULT_TUNING } from '../lib/shader-tuning'
 import { useShaderPresets } from '../lib/use-shader-presets'
+import { useAudioStore } from '@/features/quantum-audio/model/audio-store'
 
 interface PresetControlsProps {
   tuning: ShaderTuning
@@ -41,7 +42,11 @@ export function PresetControls({ tuning, onChange, canvasRef }: PresetControlsPr
 
   const handleLoad = (name: string) => {
     const preset = load(name)
-    if (preset) onChange({ ...preset })
+    if (preset) {
+      onChange({ ...preset })
+      // Sync FX/synth params to audio engine via subscriptions
+      useAudioStore.getState().hydrateFromTuning(preset)
+    }
   }
 
   const handleExport = (btn: HTMLButtonElement) => {
@@ -66,6 +71,7 @@ export function PresetControls({ tuning, onChange, canvasRef }: PresetControlsPr
         if (typeof parsed.waveSpeed !== 'number') throw new Error('Invalid preset')
         const merged: ShaderTuning = { ...DEFAULT_TUNING, ...parsed }
         onChange(merged)
+        useAudioStore.getState().hydrateFromTuning(merged)
         setImportStatus('✓ Loaded')
         setTimeout(() => setImportStatus(null), 2000)
       } catch {

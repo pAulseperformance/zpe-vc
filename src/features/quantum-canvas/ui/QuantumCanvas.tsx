@@ -1,8 +1,9 @@
-import { useRef, useMemo, useCallback } from 'react'
+import { useRef, useMemo, useCallback, useState } from 'react'
 import type { MutableRefObject } from 'react'
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
-import * as THREE from 'three'
+import { Vector2 } from 'three'
+import type { Mesh, ShaderMaterial } from 'three'
 
 import vertexShader from '../lib/shaders/quantum.vert'
 import fragmentShader from '../lib/shaders/quantum.frag'
@@ -24,7 +25,9 @@ interface Catalyst {
 interface ShaderPlaneProps {
   onRip: () => void
   tuning: ShaderTuning
+  performanceMode: boolean
   onEnergyChange: (energy: number, interferenceRatio: number, mouseX: number, mouseY: number) => void
+  onPerfSample?: (frameMs: number) => void
   energyOverride: number | null
   simClickQueue: MutableRefObject<Array<{x: number, y: number}>>
   simMouseActive: boolean
@@ -33,34 +36,44 @@ interface ShaderPlaneProps {
   onZoomChange: (delta: number) => void
   onManualClick?: (x: number, y: number) => void
   onManualRelease?: () => void
+  onManualDrag?: (x: number, y: number) => void
   audioBands?: MutableRefObject<{bass: number, mid: number, treble: number}>
   handTrackingActive?: boolean
   handTrackingPos?: MutableRefObject<{x: number, y: number, detected: boolean}>
 }
 
-function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick, onManualRelease, audioBands, handTrackingActive, handTrackingPos }: ShaderPlaneProps) {
-  const meshRef = useRef<THREE.Mesh>(null)
+function ShaderPlane({ onRip, tuning, performanceMode, onEnergyChange, onPerfSample, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick, onManualRelease, onManualDrag, audioBands, handTrackingActive, handTrackingPos }: ShaderPlaneProps) {
+  const meshRef = useRef<Mesh>(null)
   const { size } = useThree()
 
-  const mouseRef = useRef(new THREE.Vector2(0.5, 0.5))
-  const prevMouseRef = useRef(new THREE.Vector2(0.5, 0.5))
+  const mouseRef = useRef(new Vector2(0.5, 0.5))
+  const prevMouseRef = useRef(new Vector2(0.5, 0.5))
+  const velocityVecRef = useRef(new Vector2(0, 0))
   const energyRef = useRef(0)
   const hasRippedRef = useRef(false)
   const heatFieldRef = useRef(0)
   const ripFlashRef = useRef(0)
+  const isDownRef = useRef(false)
   const catalystsRef = useRef<Catalyst[]>([])
   const tuningRef = useRef(tuning)
   tuningRef.current = tuning
   const adaptiveZoomRef = useRef(1.0) // Smoothed adaptive zoom value
+  const perfEmaMsRef = useRef(16)
+  const perfSampleElapsedRef = useRef(0)
+  const interferenceRef = useRef({ value: 1, elapsed: 0 })
+  const perfModeRef = useRef(performanceMode)
+  const zoomSampleElapsedRef = useRef(0)
+  const zoomTargetRef = useRef(1.0)
+  perfModeRef.current = performanceMode
 
   const uniforms = useMemo(
     () => ({
       uTime: { value: 0 },
-      uResolution: { value: new THREE.Vector2(size.width, size.height) },
-      uMouse: { value: new THREE.Vector2(0.5, 0.5) },
+      uResolution: { value: new Vector2(size.width, size.height) },
+      uMouse: { value: new Vector2(0.5, 0.5) },
       uEnergy: { value: 0 },
       uRipFlash: { value: 0 },
-      uCatalysts: { value: Array.from({ length: MAX_CATALYSTS }, () => new THREE.Vector2(0, 0)) },
+      uCatalysts: { value: Array.from({ length: MAX_CATALYSTS }, () => new Vector2(0, 0)) },
       uCatalystTimes: { value: new Float32Array(MAX_CATALYSTS) },
       uCatalystCount: { value: 0 },
       // Tunable uniforms
@@ -83,7 +96,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
       uPaletteMode: { value: tuning.paletteMode ?? 1 },
       uStarField: { value: tuning.starField ?? 0 },
       uWavelength: { value: tuning.wavelength ?? 2 },
-      uMouseVelocity: { value: new THREE.Vector2(0, 0) },
+      uMouseVelocity: { value: new Vector2(0, 0) },
       // Barrier / Diffraction
       uBarrierEnabled: { value: tuning.barrierEnabled ?? 0 },
       uBarrierY: { value: tuning.barrierY ?? 0.5 },
@@ -109,13 +122,15 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
       if (e.uv) {
         prevMouseRef.current.copy(mouseRef.current)
         mouseRef.current.set(e.uv.x, e.uv.y)
+        if (isDownRef.current) onManualDrag?.(e.uv.x, e.uv.y)
       }
     },
-    []
+    [onManualDrag]
   )
 
   const onPointerDown = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
+      isDownRef.current = true
       energyRef.current += tuningRef.current.clickSpike
 
       const maxW = Math.floor(tuningRef.current.maxWaves)
@@ -131,6 +146,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
 
   const onPointerUp = useCallback(
     () => {
+      isDownRef.current = false
       onManualRelease?.()
     },
     [onManualRelease]
@@ -138,6 +154,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
 
   const onPointerLeave = useCallback(() => {
     prevMouseRef.current.copy(mouseRef.current)
+    isDownRef.current = false
     onManualRelease?.()
   }, [onManualRelease])
 
@@ -150,16 +167,25 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
   )
 
   useFrame((state, delta) => {
-    const mat = meshRef.current?.material as THREE.ShaderMaterial | undefined
+    const mat = meshRef.current?.material as ShaderMaterial | undefined
     if (!mat) return
 
     const now = state.clock.elapsedTime
     const t = tuningRef.current
 
-    for (const cat of catalystsRef.current) {
+    const catsMutable = catalystsRef.current
+    let writeIdx = 0
+    for (let i = 0; i < catsMutable.length; i++) {
+      const cat = catsMutable[i]
       if (cat.time < 0) cat.time = now
+      if ((now - cat.time) < t.waveLifetime) {
+        catsMutable[writeIdx] = cat
+        writeIdx += 1
+      }
     }
-    catalystsRef.current = catalystsRef.current.filter(c => (now - c.time) < t.waveLifetime)
+    if (catsMutable.length !== writeIdx) {
+      catsMutable.length = writeIdx
+    }
 
     // Override mouse position with sim mouse when active
     if (simMouseActive) {
@@ -173,15 +199,20 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
 
     // Drain sim click queue (injected from DevPanel auto-sim)
     const maxW = Math.floor(t.maxWaves)
-    const simClicks = simClickQueue.current.splice(0)
-    for (const click of simClicks) {
+    const simClicks = simClickQueue.current
+    for (let i = 0; i < simClicks.length; i++) {
+      const click = simClicks[i]
       catalystsRef.current.push({ x: click.x, y: click.y, time: -1 })
       energyRef.current += t.clickSpike
       if (catalystsRef.current.length > maxW) catalystsRef.current.shift()
     }
+    if (simClicks.length > 0) {
+      simClicks.length = 0
+    }
 
     const velocity = mouseRef.current.distanceTo(prevMouseRef.current)
-    const velocityVec = mouseRef.current.clone().sub(prevMouseRef.current)
+    const velocityVec = velocityVecRef.current
+    velocityVec.copy(mouseRef.current).sub(prevMouseRef.current)
     prevMouseRef.current.copy(mouseRef.current)
 
     // Energy input from movement
@@ -196,7 +227,8 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
 
     // Phase 2: Persistent heat field — accumulates from active catalysts, decays independently
     const cats = catalystsRef.current
-    for (const cat of cats) {
+    for (let i = 0; i < cats.length; i++) {
+      const cat = cats[i]
       const age = state.clock.elapsedTime - cat.time
       if (age > 0 && age < t.waveLifetime) {
         heatFieldRef.current += Math.max(0, 1 - age / t.waveLifetime) * delta * 2
@@ -205,18 +237,30 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
     heatFieldRef.current *= Math.pow(0.97, delta * 60) // Slow independent decay
     heatFieldRef.current = Math.min(heatFieldRef.current, 3.0) // Cap to prevent runaway
 
-    // Compute JS-side interference ratio for audio feedback
-    const interferenceRatio = computeInterferenceRatio(
-      cats,
-      mouseRef.current.x,
-      mouseRef.current.y,
-      now,
-      t.waveFreq,
-      t.waveLifetime,
-    )
+    perfEmaMsRef.current = perfEmaMsRef.current * 0.92 + delta * 1000 * 0.08
+    perfSampleElapsedRef.current += delta
+    if (perfSampleElapsedRef.current >= 0.5) {
+      onPerfSample?.(perfEmaMsRef.current)
+      perfSampleElapsedRef.current = 0
+    }
+
+    // Sample interference at a reduced rate in performance mode.
+    interferenceRef.current.elapsed += delta
+    const interferenceHz = perfModeRef.current ? 12 : 30
+    if (interferenceRef.current.elapsed >= 1 / interferenceHz) {
+      interferenceRef.current.value = computeInterferenceRatio(
+        cats,
+        mouseRef.current.x,
+        mouseRef.current.y,
+        now,
+        t.waveFreq,
+        t.waveLifetime,
+      )
+      interferenceRef.current.elapsed = 0
+    }
 
     // Report energy + interference to parent
-    onEnergyChange(effectiveEnergy, interferenceRatio, mouseRef.current.x, mouseRef.current.y)
+    onEnergyChange(effectiveEnergy, interferenceRef.current.value, mouseRef.current.x, mouseRef.current.y)
 
     if (energyRef.current >= t.ripThreshold && !hasRippedRef.current) {
       hasRippedRef.current = true
@@ -230,7 +274,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
     }
 
     // Catalyst uniforms
-    const catPositions = mat.uniforms.uCatalysts.value as THREE.Vector2[]
+    const catPositions = mat.uniforms.uCatalysts.value as Vector2[]
     const catTimes = mat.uniforms.uCatalystTimes.value as Float32Array
 
     for (let i = 0; i < MAX_CATALYSTS; i++) {
@@ -281,7 +325,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
     mat.uniforms.uSlitCount.value = t.slitCount ?? 2
     mat.uniforms.uSlitWidth.value = t.slitWidth ?? 0.04
     mat.uniforms.uSlitSeparation.value = t.slitSeparation ?? 0.15
-    mat.uniforms.uDiffSamples.value = t.diffSamples ?? 12
+    mat.uniforms.uDiffSamples.value = perfModeRef.current ? Math.min(4, t.diffSamples ?? 12) : (t.diffSamples ?? 12)
     mat.uniforms.uPointerHover.value = (t.pointerHover ?? false) ? 1.0 : 0.0
     mat.uniforms.uHoverWarp.value = t.hoverWarp ?? 0.1
     mat.uniforms.uSpinSpeed.value = t.spinSpeed ?? 1.0
@@ -301,30 +345,34 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
 
     // ── Adaptive Zoom ──
     let targetScale = t.viewScale ?? 1.0
-    if ((t.zoomMode ?? 0) >= 1) {
-      // Compute bounding box of all active catalysts + gravity bodies
-      let minX = 0.5, maxX = 0.5, minY = 0.5, maxY = 0.5
-      for (const cat of cats) {
-        minX = Math.min(minX, cat.x)
-        maxX = Math.max(maxX, cat.x)
-        minY = Math.min(minY, cat.y)
-        maxY = Math.max(maxY, cat.y)
+    if (!perfModeRef.current && (t.zoomMode ?? 0) >= 1) {
+      zoomSampleElapsedRef.current += delta
+      if (zoomSampleElapsedRef.current >= 1 / 15) {
+        // Compute bounding box of all active catalysts + gravity bodies
+        let minX = 0.5, maxX = 0.5, minY = 0.5, maxY = 0.5
+        for (const cat of cats) {
+          minX = Math.min(minX, cat.x)
+          maxX = Math.max(maxX, cat.x)
+          minY = Math.min(minY, cat.y)
+          maxY = Math.max(maxY, cat.y)
+        }
+        // Include gravity body positions if available
+        const grav = gravBodyPositions.current
+        if (grav) {
+          minX = Math.min(minX, grav.click.x, grav.mouse.x)
+          maxX = Math.max(maxX, grav.click.x, grav.mouse.x)
+          minY = Math.min(minY, grav.click.y, grav.mouse.y)
+          maxY = Math.max(maxY, grav.click.y, grav.mouse.y)
+        }
+        // Scale so the bounding box fits within 60% of the viewport
+        const spanX = maxX - minX
+        const spanY = maxY - minY
+        const maxSpan = Math.max(spanX, spanY)
+        const requiredScale = Math.max(1.0, maxSpan / 0.6)
+        zoomTargetRef.current = Math.max(targetScale, requiredScale)
+        zoomSampleElapsedRef.current = 0
       }
-      // Include gravity body positions if available
-      const grav = gravBodyPositions.current
-      if (grav) {
-        minX = Math.min(minX, grav.click.x, grav.mouse.x)
-        maxX = Math.max(maxX, grav.click.x, grav.mouse.x)
-        minY = Math.min(minY, grav.click.y, grav.mouse.y)
-        maxY = Math.max(maxY, grav.click.y, grav.mouse.y)
-      }
-      // Compute required scale with padding
-      const spanX = maxX - minX
-      const spanY = maxY - minY
-      const maxSpan = Math.max(spanX, spanY)
-      // Scale so the bounding box fits within 60% of the viewport
-      const requiredScale = Math.max(1.0, maxSpan / 0.6)
-      targetScale = Math.max(targetScale, requiredScale)
+      targetScale = zoomTargetRef.current
     }
     // Smooth lerp toward target zoom (prevents jarring jumps)
     adaptiveZoomRef.current += (targetScale - adaptiveZoomRef.current) * Math.min(1.0, delta * 3.0)
@@ -358,6 +406,7 @@ function ShaderPlane({ onRip, tuning, onEnergyChange, energyOverride, simClickQu
 interface QuantumCanvasProps {
   onRip: () => void
   tuning: ShaderTuning
+  performanceMode?: boolean
   onEnergyChange: (energy: number, interferenceRatio: number, mouseX: number, mouseY: number) => void
   energyOverride: number | null
   simClickQueue: MutableRefObject<Array<{x: number, y: number}>>
@@ -367,30 +416,62 @@ interface QuantumCanvasProps {
   onZoomChange: (delta: number) => void
   onManualClick?: (x: number, y: number) => void
   onManualRelease?: () => void
+  onManualDrag?: (x: number, y: number) => void
   onCanvasReady?: (canvas: HTMLCanvasElement) => void
   audioBands?: MutableRefObject<{bass: number, mid: number, treble: number}>
   handTrackingActive?: boolean
   handTrackingPos?: MutableRefObject<{x: number, y: number, detected: boolean}>
 }
 
-export function QuantumCanvas({ onRip, tuning, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick, onManualRelease, onCanvasReady, audioBands, handTrackingActive, handTrackingPos }: QuantumCanvasProps) {
+export function QuantumCanvas({ onRip, tuning, performanceMode = false, onEnergyChange, energyOverride, simClickQueue, simMouseActive, simMousePos, gravBodyPositions, onZoomChange, onManualClick, onManualRelease, onManualDrag, onCanvasReady, audioBands, handTrackingActive, handTrackingPos }: QuantumCanvasProps) {
+  const [dprMax, setDprMax] = useState(1.25)
+  const [bloomIntensity, setBloomIntensity] = useState(1.5)
+  const [bloomEnabled, setBloomEnabled] = useState(true)
+
+  const handlePerfSample = useCallback((frameMs: number) => {
+    if (performanceMode) return
+    // Coarse quality tiers with hysteresis to avoid frequent toggling.
+    if (frameMs > 22) {
+      setDprMax((prev) => (prev === 1 ? prev : 1))
+      setBloomEnabled((prev) => (prev ? false : prev))
+      return
+    }
+    if (frameMs > 18) {
+      setDprMax((prev) => (prev === 1.1 ? prev : 1.1))
+      setBloomEnabled((prev) => (prev ? prev : true))
+      setBloomIntensity((prev) => (prev === 0.75 ? prev : 0.75))
+      return
+    }
+    if (frameMs < 14) {
+      setDprMax((prev) => (prev === 1.25 ? prev : 1.25))
+      setBloomEnabled((prev) => (prev ? prev : true))
+      setBloomIntensity((prev) => (prev === 1.5 ? prev : 1.5))
+    }
+  }, [performanceMode])
+
+  const effectiveDprMax = performanceMode ? 1 : dprMax
+  const effectiveBloomEnabled = !performanceMode && bloomEnabled
+  const effectiveBloomIntensity = performanceMode ? 0 : bloomIntensity
+
   return (
     <Canvas
-      gl={{ antialias: false, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: true }}
+      gl={{ antialias: false, alpha: false, powerPreference: 'high-performance' }}
       camera={{ position: [0, 0, 1] }}
-      dpr={[1, 1.5]}
+      dpr={[1, effectiveDprMax]}
       style={{ background: '#000000', cursor: 'none' }}
       onCreated={({ gl }) => onCanvasReady?.(gl.domElement)}
     >
-      <ShaderPlane onRip={onRip} tuning={tuning} onEnergyChange={onEnergyChange} energyOverride={energyOverride} simClickQueue={simClickQueue} simMouseActive={simMouseActive} simMousePos={simMousePos} gravBodyPositions={gravBodyPositions} onZoomChange={onZoomChange} onManualClick={onManualClick} onManualRelease={onManualRelease} audioBands={audioBands} handTrackingActive={handTrackingActive} handTrackingPos={handTrackingPos} />
-      <EffectComposer>
-        <Bloom
-          intensity={1.5}
-          luminanceThreshold={0.1}
-          luminanceSmoothing={0.9}
-          mipmapBlur
-        />
-      </EffectComposer>
+      <ShaderPlane onRip={onRip} tuning={tuning} performanceMode={performanceMode} onEnergyChange={onEnergyChange} onPerfSample={handlePerfSample} energyOverride={energyOverride} simClickQueue={simClickQueue} simMouseActive={simMouseActive} simMousePos={simMousePos} gravBodyPositions={gravBodyPositions} onZoomChange={onZoomChange} onManualClick={onManualClick} onManualRelease={onManualRelease} onManualDrag={onManualDrag} audioBands={audioBands} handTrackingActive={handTrackingActive} handTrackingPos={handTrackingPos} />
+      {effectiveBloomEnabled && (
+        <EffectComposer>
+          <Bloom
+            intensity={effectiveBloomIntensity}
+            luminanceThreshold={0.1}
+            luminanceSmoothing={0.9}
+            mipmapBlur
+          />
+        </EffectComposer>
+      )}
     </Canvas>
   )
 }

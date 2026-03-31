@@ -1,0 +1,67 @@
+/* ─── CSS Starfield ───
+   Pure CSS animated star layers — renders in <50ms, zero JavaScript.
+   Acts as instant visual placeholder while Three.js loads async.
+   Three layers at different speeds create depth parallax.
+*/
+
+.starfield {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 50%, #0a0a1a 0%, #000000 70%);
+}
+
+/* Star layers — white dots via radial gradients */
+.starfield::before,
+.starfield::after {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  background-image:
+    radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.7) 0%, transparent 50%),
+    radial-gradient(1px 1px at 30% 70%, rgba(255,255,255,0.5) 0%, transparent 50%),
+    radial-gradient(1px 1px at 50% 40%, rgba(255,255,255,0.6) 0%, transparent 50%),
+    radial-gradient(1px 1px at 70% 10%, rgba(255,255,255,0.4) 0%, transparent 50%),
+    radial-gradient(1px 1px at 80% 60%, rgba(255,255,255,0.8) 0%, transparent 50%),
+    radial-gradient(1px 1px at 15% 85%, rgba(255,255,255,0.5) 0%, transparent 50%),
+    radial-gradient(1px 1px at 95% 35%, rgba(255,255,255,0.6) 0%, transparent 50%),
+    radial-gradient(1.5px 1.5px at 25% 55%, rgba(200,180,255,0.6) 0%, transparent 50%),
+    radial-gradient(1px 1px at 60% 90%, rgba(255,255,255,0.4) 0%, transparent 50%),
+    radial-gradient(1px 1px at 40% 15%, rgba(255,255,255,0.7) 0%, transparent 50%),
+    radial-gradient(1.5px 1.5px at 85% 80%, rgba(180,160,255,0.5) 0%, transparent 50%),
+    radial-gradient(1px 1px at 5% 45%, rgba(255,255,255,0.5) 0%, transparent 50%);
+  background-size: 250px 250px;
+}
+
+.starfield::before {
+  animation: starfield-drift 90s linear infinite;
+  opacity: 0.8;
+}
+
+.starfield::after {
+  animation: starfield-drift 150s linear infinite reverse;
+  opacity: 0.5;
+  background-size: 350px 350px;
+}
+
+/* Subtle purple nebula glow */
+.starfield-nebula {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 30% 40%, rgba(88, 28, 135, 0.08) 0%, transparent 60%),
+    radial-gradient(ellipse at 70% 60%, rgba(59, 7, 100, 0.06) 0%, transparent 50%);
+  animation: nebula-pulse 8s ease-in-out infinite alternate;
+}
+
+@keyframes starfield-drift {
+  from { transform: translate(0, 0); }
+  to { transform: translate(-125px, -125px); }
+}
+
+@keyframes nebula-pulse {
+  from { opacity: 0.4; }
+  to { opacity: 0.8; }
+}

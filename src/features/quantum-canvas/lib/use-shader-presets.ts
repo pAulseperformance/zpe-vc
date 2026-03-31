@@ -21,7 +21,9 @@ function loadPresets(): PresetMap {
         }
       }
     }
-  } catch {}
+  } catch {
+    // Ignore malformed persisted presets and fall back to defaults.
+  }
   
   // Always enforce built-in presets over user overrides
   for (const [k, v] of Object.entries(BUILT_IN_PRESETS)) {

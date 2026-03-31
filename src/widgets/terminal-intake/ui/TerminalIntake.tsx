@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 
 /* ─── Boot Sequence Lines ─── */
@@ -8,9 +8,9 @@ const BOOT_LINES = [
   '> ideas are just noise. we forge what survives.',
 ]
 
-const LINE_DELAY_MS = 1200      // Delay between each line
-const TYPE_SPEED_MS = 35        // Speed per character
-const INPUT_REVEAL_DELAY_MS = 800 // After last line, before input appears
+const LINE_DELAY_MS = 1200
+const TYPE_SPEED_MS = 35
+const INPUT_REVEAL_DELAY_MS = 800
 
 /* ─── Typewriter Hook ─── */
 function useTypewriter(text: string, speed: number, start: boolean) {
@@ -39,14 +39,9 @@ function useTypewriter(text: string, speed: number, start: boolean) {
 }
 
 /* ─── Single Boot Line ─── */
-interface BootLineProps {
-  text: string
-  speed: number
-  start: boolean
-  onDone: () => void
-}
-
-function BootLine({ text, speed, start, onDone }: BootLineProps) {
+function BootLine({ text, speed, start, onDone }: {
+  text: string; speed: number; start: boolean; onDone: () => void
+}) {
   const { displayed, done } = useTypewriter(text, speed, start)
 
   useEffect(() => {
@@ -64,14 +59,17 @@ function BootLine({ text, speed, start, onDone }: BootLineProps) {
 }
 
 /* ─── Terminal Intake ─── */
-export function TerminalIntake({ onBootDone }: { onBootDone?: () => void }) {
+export function TerminalIntake({ onBootDone, forgeToken }: { onBootDone?: () => void; forgeToken?: string | null }) {
   const [activeLine, setActiveLine] = useState(0)
   const [bootDone, setBootDone] = useState(false)
   const [showInput, setShowInput] = useState(false)
   const [input, setInput] = useState('')
+  const [forgeState, setForgeState] = useState<'idle' | 'forging' | 'done'>('idle')
+  const [forgeResponse, setForgeResponse] = useState('')
+  const [conversation, setConversation] = useState<Array<{ idea: string; response: string }>>([])
   const inputRef = useRef<HTMLInputElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
-  // Advance to next boot line after delay
   const handleLineDone = () => {
     const next = activeLine + 1
     if (next < BOOT_LINES.length) {
@@ -85,20 +83,93 @@ export function TerminalIntake({ onBootDone }: { onBootDone?: () => void }) {
     }
   }
 
-  // Auto-focus input when it appears
   useEffect(() => {
-    if (showInput) {
+    if (showInput && forgeState === 'idle') {
       const timer = setTimeout(() => inputRef.current?.focus(), 300)
       return () => clearTimeout(timer)
     }
-  }, [showInput])
+  }, [showInput, forgeState])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Auto-scroll to bottom when conversation grows
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+  }, [conversation, forgeResponse])
+
+  // Auto-reset input after AI finishes responding
+  useEffect(() => {
+    if (forgeState !== 'done') return
+    const timer = setTimeout(() => {
+      setConversation(prev => [...prev, { idea: input, response: forgeResponse }])
+      setForgeState('idle')
+      setForgeResponse('')
+      setInput('')
+      setTimeout(() => inputRef.current?.focus(), 100)
+    }, 1000) // brief pause so user can read the response
+    return () => clearTimeout(timer)
+  }, [forgeState]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
-    if (input.trim()) {
-      window.location.href = `mailto:hello@zpe.vc?subject=Forge%20Intake&body=${encodeURIComponent(input)}`
+    const idea = input.trim()
+    if (!idea || forgeState !== 'idle') return
+
+    setForgeState('forging')
+    setForgeResponse('')
+
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (forgeToken) headers['Authorization'] = `Bearer ${forgeToken}`
+
+      const res = await fetch('/api/forge', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ idea }),
+      })
+
+      if (res.status === 401) {
+        setForgeResponse('> forge access denied. the rip was not earned.')
+        setForgeState('done')
+        return
+      }
+
+      if (!res.ok || !res.body) {
+        setForgeResponse('> the forge is silent. try again.')
+        setForgeState('done')
+        return
+      }
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6)
+            if (data === '[DONE]') continue
+            try {
+              const parsed = JSON.parse(data) as { response?: string }
+              if (parsed.response) {
+                setForgeResponse(prev => prev + parsed.response)
+              }
+            } catch { /* skip */ }
+          }
+        }
+      }
+
+      setForgeState('done')
+    } catch {
+      setForgeResponse('> connection to the forge was severed.')
+      setForgeState('done')
     }
-  }
+  }, [input, forgeState, forgeToken])
 
   return (
     <motion.div
@@ -108,6 +179,7 @@ export function TerminalIntake({ onBootDone }: { onBootDone?: () => void }) {
       className="absolute inset-0 z-30 flex items-center justify-center bg-black"
     >
       <div className="w-full max-w-2xl px-8">
+      <div ref={scrollRef} className="max-h-[70vh] overflow-y-auto">
         {/* Boot sequence */}
         {BOOT_LINES.map((line, i) => (
           <BootLine
@@ -119,8 +191,22 @@ export function TerminalIntake({ onBootDone }: { onBootDone?: () => void }) {
           />
         ))}
 
-        {/* Active input — appears after boot */}
-        {showInput && (
+        {/* Conversation history */}
+        {conversation.map((entry, i) => (
+          <div key={i} className="mt-4">
+            <div className="font-mono text-sm text-cold-white-dim/40">
+              <span className="text-electric-purple/40">{'> '}</span>
+              <span className="text-cold-white-dim/30">initiate_forge: </span>
+              <span className="text-cold-white-dim/50">{entry.idea}</span>
+            </div>
+            <div className="mt-2 font-mono text-sm leading-relaxed text-cold-white-dim/40 border-l-2 border-electric-purple/15 pl-4">
+              {entry.response}
+            </div>
+          </div>
+        ))}
+
+        {/* Input line */}
+        {showInput && forgeState !== 'done' && (
           <motion.form
             onSubmit={handleSubmit}
             initial={{ opacity: 0 }}
@@ -141,9 +227,11 @@ export function TerminalIntake({ onBootDone }: { onBootDone?: () => void }) {
                 onClick={() => inputRef.current?.focus()}
               >
                 <span className="text-cold-white">{input}</span>
-                <span className="inline-block animate-blink text-cold-white">█</span>
+                {forgeState === 'idle' && (
+                  <span className="inline-block animate-blink text-cold-white">█</span>
+                )}
 
-                {input.length === 0 && (
+                {input.length === 0 && forgeState === 'idle' && (
                   <span className="absolute left-0 top-0 text-cold-white-dim/20 select-none pointer-events-none">
                     [Enter your raw idea...]
                   </span>
@@ -154,6 +242,7 @@ export function TerminalIntake({ onBootDone }: { onBootDone?: () => void }) {
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
+                  disabled={forgeState !== 'idle'}
                   className="absolute inset-0 w-full bg-transparent text-transparent caret-transparent outline-none border-none font-mono text-sm"
                   autoComplete="off"
                   spellCheck={false}
@@ -163,8 +252,34 @@ export function TerminalIntake({ onBootDone }: { onBootDone?: () => void }) {
           </motion.form>
         )}
 
-        {/* Subtle hint after input appears */}
-        {bootDone && showInput && (
+        {/* Forging indicator */}
+        {forgeState === 'forging' && forgeResponse.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="mt-6 font-mono text-xs tracking-[0.15em] text-electric-purple/40"
+          >
+            <span className="animate-pulse">⟡ forging...</span>
+          </motion.div>
+        )}
+
+        {/* AI response */}
+        {forgeResponse.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className="mt-6 font-mono text-sm leading-relaxed text-cold-white-dim/70 border-l-2 border-electric-purple/30 pl-4"
+          >
+            {forgeResponse}
+            {forgeState === 'forging' && (
+              <span className="inline-block animate-blink text-electric-purple/60">█</span>
+            )}
+          </motion.div>
+        )}
+
+        {/* Hint */}
+        {bootDone && showInput && forgeState === 'idle' && conversation.length === 0 && (
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -174,6 +289,18 @@ export function TerminalIntake({ onBootDone }: { onBootDone?: () => void }) {
             Press Enter to submit to the forge
           </motion.p>
         )}
+
+        {forgeState === 'done' && (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5 }}
+            className="mt-6 font-mono text-[0.6rem] tracking-[0.15em] text-cold-white-dim/15 uppercase"
+          >
+            Press Escape to return to the void
+          </motion.p>
+        )}
+      </div>
       </div>
     </motion.div>
   )
