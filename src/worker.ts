@@ -1,5 +1,5 @@
 import type { ExecutionContext } from '@cloudflare/workers-types'
-import { MAX_USES, getBearerToken, signToken, verifyToken } from './worker/forge-auth'
+import { MAX_USES, TOKEN_TTL_MS, getBearerToken, signToken, verifyToken } from './worker/forge-auth'
 import { isJsonRequest, parseForgeIdea } from './worker/forge-request'
 
 export interface Env {
@@ -39,7 +39,7 @@ export default {
 
     // ── API Routes ──
     if (url.pathname === '/api/forge/token' && request.method === 'POST') {
-      return mintForgeToken(env)
+      return mintForgeToken(request, env)
     }
 
     if (url.pathname === '/api/forge' && request.method === 'POST') {
@@ -68,7 +68,20 @@ export default {
 
 // ── Token Minting ──
 
-async function mintForgeToken(env: Env): Promise<Response> {
+async function mintForgeToken(request: Request, env: Env): Promise<Response> {
+  // IP-based rate limit: max 10 tokens per 10 minutes per IP
+  const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown'
+  const rateLimitKey = `forge-ratelimit:${ip}`
+  const currentCount = await env.FORGE_LOG.get(rateLimitKey)
+  const count = currentCount ? Number(currentCount) : 0
+  if (count >= 10) {
+    return new Response(JSON.stringify({ error: 'Too many token requests. Try again later.' }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json', 'Retry-After': '600' },
+    })
+  }
+  await env.FORGE_LOG.put(rateLimitKey, String(count + 1), { expirationTtl: 600 })
+
   const payload = {
     iat: Date.now(),
     uses: 0,
@@ -91,7 +104,11 @@ async function getServerTokenUses(env: Env, nonce: string): Promise<number> {
 
 async function incrementServerTokenUses(env: Env, nonce: string): Promise<number> {
   const nextUses = (await getServerTokenUses(env, nonce)) + 1
-  await env.FORGE_LOG.put(`forge-token:${nonce}`, String(nextUses))
+  // NOTE: KV does not support atomic increment. Concurrent requests with the same nonce
+  // can race past this check before the write lands. True atomic enforcement requires
+  // a Durable Object counter. This is a best-effort limit for single-user tokens.
+  const ttlSeconds = Math.ceil(TOKEN_TTL_MS / 1000) + 60 // expire slightly after token TTL
+  await env.FORGE_LOG.put(`forge-token:${nonce}`, String(nextUses), { expirationTtl: ttlSeconds })
   return nextUses
 }
 
@@ -178,12 +195,16 @@ async function saveForgeLog(env: Env, idea: string, stream: ReadableStream): Pro
   const decoder = new TextDecoder()
   let fullResponse = ''
 
+  let buffer = ''
   try {
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
-      const chunk = decoder.decode(value, { stream: true })
-      for (const line of chunk.split('\n')) {
+      // Accumulate across chunks — SSE lines can be split mid-chunk
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? '' // keep any incomplete trailing line
+      for (const line of lines) {
         if (line.startsWith('data: ')) {
           const data = line.slice(6)
           if (data === '[DONE]') continue
@@ -194,14 +215,25 @@ async function saveForgeLog(env: Env, idea: string, stream: ReadableStream): Pro
         }
       }
     }
+    // Flush any remaining buffered line after stream ends
+    if (buffer.startsWith('data: ')) {
+      const data = buffer.slice(6)
+      if (data !== '[DONE]') {
+        try {
+          const parsed = JSON.parse(data) as { response?: string }
+          if (parsed.response) fullResponse += parsed.response
+        } catch { /* skip */ }
+      }
+    }
   } catch { /* stream error — save what we have */ }
 
-  const key = `forge-log:${Date.now()}`
+  // Use timestamp + UUID for uniqueness; set 30-day retention to prevent unbounded growth
+  const key = `forge-log:${Date.now()}-${crypto.randomUUID()}`
   await env.FORGE_LOG.put(key, JSON.stringify({
     idea,
     response: fullResponse,
     timestamp: new Date().toISOString(),
-  }))
+  }), { expirationTtl: 30 * 24 * 60 * 60 })
 }
 
 async function handleForgeLog(request: Request, env: Env): Promise<Response> {

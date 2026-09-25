@@ -455,7 +455,7 @@ export function QuantumCanvas({ onRip, tuning, performanceMode = false, onEnergy
 
   return (
     <Canvas
-      gl={{ antialias: false, alpha: false, powerPreference: 'high-performance' }}
+      gl={{ antialias: false, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: true }}
       camera={{ position: [0, 0, 1] }}
       dpr={[1, effectiveDprMax]}
       style={{ background: '#000000', cursor: 'none' }}

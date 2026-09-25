@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 
 interface AutoSimCallbacks {
   onSimClick: (x: number, y: number) => void
@@ -25,15 +25,12 @@ export function useAutoSim(callbacks: AutoSimCallbacks) {
   const [simMouseRadius, setSimMouseRadius] = useState(0.15)
 
   const callbacksRef = useRef(callbacks)
-  useEffect(() => {
-    callbacksRef.current = callbacks
-  }, [callbacks])
+  // Sync refs during render (not in an effect) to eliminate the post-paint stale window
+  callbacksRef.current = callbacks
 
   // Refs to avoid tearing down the loop when slider changes
   const simStateRef = useRef({ simMode, simSeparation, simRate, simMouseSpeed, simMouseRadius, simClicksOn, simMouseOn, simActive })
-  useEffect(() => {
-    simStateRef.current = { simMode, simSeparation, simRate, simMouseSpeed, simMouseRadius, simClicksOn, simMouseOn, simActive }
-  }, [simMode, simSeparation, simRate, simMouseSpeed, simMouseRadius, simClicksOn, simMouseOn, simActive])
+  simStateRef.current = { simMode, simSeparation, simRate, simMouseSpeed, simMouseRadius, simClicksOn, simMouseOn, simActive }
   
   // Physics state for gravity mode
   const gravStateRef = useRef({

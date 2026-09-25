@@ -24,7 +24,8 @@
   "kv_namespaces": [
     {
       "binding": "FORGE_LOG",
-      "id": "cd612b74d74c4e2dbc6ca71d91862629"
+      "id": "cd612b74d74c4e2dbc6ca71d91862629",
+      "preview_id": "00000000000000000000000000000000"
     }
   ]
 }
