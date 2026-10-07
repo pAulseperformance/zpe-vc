@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface AutoSimCallbacks {
   onSimClick: (x: number, y: number) => void

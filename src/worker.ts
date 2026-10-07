@@ -13,7 +13,7 @@ export interface Env {
     }) => Promise<ReadableStream | { response: string }>
   }
   FORGE_LOG: {
-    put: (key: string, value: string) => Promise<void>
+    put: (key: string, value: string, options?: { expirationTtl?: number }) => Promise<void>
     get: (key: string) => Promise<string | null>
     list: (options?: { prefix?: string; limit?: number }) => Promise<{ keys: Array<{ name: string }> }>
   }
