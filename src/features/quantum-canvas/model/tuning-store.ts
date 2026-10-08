@@ -4,7 +4,7 @@ import { immer } from 'zustand/middleware/immer'
 import type { ShaderTuning } from '../lib/shader-tuning'
 import { DEFAULT_TUNING, BUILT_IN_PRESETS } from '../lib/shader-tuning'
 
-const ACTIVE_KEY = 'zpe-shader-active-v4'
+const ACTIVE_KEY = 'zpe-shader-active-v5'
 const PRESETS_KEY = 'zpe-shader-presets-v2'
 const THUMBNAIL_KEY = 'zpe-shader-thumbnails-v1'
 

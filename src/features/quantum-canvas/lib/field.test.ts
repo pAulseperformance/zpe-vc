@@ -122,3 +122,15 @@ describe('the interference ratio follows the live tuning', () => {
     }
   })
 })
+
+describe('the shipped default keeps the calm shimmer', () => {
+  it('sets frequency times speed to 30 radians per second, the rate the page always had', async () => {
+    const { DEFAULT_TUNING } = await import('./shader-tuning')
+    expect(DEFAULT_TUNING.waveFreq * DEFAULT_TUNING.waveSpeed).toBeCloseTo(30, 6)
+  })
+
+  it('keeps the ring travelling at one unit per second, so the crests ride it', async () => {
+    const { DEFAULT_TUNING } = await import('./shader-tuning')
+    expect(DEFAULT_TUNING.waveSpeed).toBeCloseTo(1, 6)
+  })
+})

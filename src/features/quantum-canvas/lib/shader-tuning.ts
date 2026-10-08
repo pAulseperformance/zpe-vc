@@ -81,7 +81,7 @@ export interface ShaderTuning {
 
 export const DEFAULT_TUNING: ShaderTuning = {
   waveSpeed: 1,
-  waveFreq: 150,
+  waveFreq: 30,
   waveWidth: 0.1,
   emDamping: 1.6,
   gravDamping: 1.6,
