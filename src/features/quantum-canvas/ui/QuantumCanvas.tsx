@@ -253,7 +253,7 @@ function ShaderPlane({ onRip, tuning, performanceMode, onEnergyChange, onPerfSam
         mouseRef.current.x,
         mouseRef.current.y,
         now,
-        t.waveFreq,
+        t,
         t.waveLifetime,
       )
       interferenceRef.current.elapsed = 0

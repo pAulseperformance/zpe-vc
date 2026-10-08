@@ -236,7 +236,7 @@ vec2 huygensDiffraction(vec2 pixelUV, vec2 catUV, float freq, float age, float s
       if (d1 > waveFront) continue;
 
       // Secondary source: same phase as arriving wave, re-emits spherically
-      float wave = sin(totalDist * freq - age * 30.0);
+      float wave = sin(totalDist * freq - age * freq * speed);
 
       // Amplitude falls off with total path length
       float amp = 1.0 / (1.0 + totalDist * 8.0);
@@ -340,7 +340,8 @@ void main() {
                    + snoise(vec2(warpAngle * 13.0 + 50.0, rawDist * 25.0 + age * 3.0)) * 0.01;
     float dist = rawDist + distWarp;
 
-    // Inverse-square gravitational decay (1/r² law, not exponential)
+    // Temporal falloff of the wake. The shader pairs this with the wave age, not the distance
+    // from the source, so it is not an inverse-square law. A radial law is engine plan P1.1.
     float lenzDamping = 1.0 / (1.0 + age * age * uGravDamping * uGravDamping);
 
     // Wavefront ring (sharp visual)
@@ -352,8 +353,8 @@ void main() {
     if (atFront > 0.001) {
       float n1 = snoise(warpedUV * 40.0 + t * 5.0) * 0.5 + 0.5;
       float n2 = snoise(warpedUV * 80.0 - t * 3.0 + 30.0) * 0.3 + 0.5;
-      float emWaveSigned = sin(dist * uWaveFreq - age * 30.0) * n1
-                         + sin(dist * uWaveFreq * 1.7 + age * 15.0) * n2 * 0.4;
+      float emWaveSigned = sin(dist * uWaveFreq - age * uWaveFreq * uWaveSpeed) * n1
+                         + sin(dist * uWaveFreq * 1.7 + age * uWaveFreq * 1.7 * uWaveSpeed) * n2 * 0.4;
       emIntensity = atFront * abs(emWaveSigned) * emDamping;
     }
 
@@ -367,7 +368,7 @@ void main() {
     // ── Clean sine for interference — no noise, no harmonics ──
     float cleanWave = 0.0;
     if (extendedField > 0.001) {
-      cleanWave = sin(dist * uWaveFreq - age * 30.0);
+      cleanWave = sin(dist * uWaveFreq - age * uWaveFreq * uWaveSpeed);
 
       // ── Barrier diffraction ──
       if (uBarrierEnabled > 0.5) {
@@ -471,7 +472,7 @@ void main() {
 
     // ── Gravitational wave interference field ──
     if (lenzMag > 0.001) {
-      float gravWave = sin(dist * uWaveFreq * 0.3 - age * 10.0);
+      float gravWave = sin(dist * uWaveFreq * 0.3 - age * uWaveFreq * 0.3 * uWaveSpeed);
       gravFieldSigned += gravWave * lenzMag;
       gravFieldEnvelope += abs(gravWave) * lenzMag;
     }

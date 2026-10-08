@@ -1,11 +1,13 @@
 /**
  * JS-side approximation of EM wave interference at a sample point.
  *
- * Mirrors the shader's `cleanWave = sin(dist * freq - age * 30)` formula
- * to estimate the interference ratio without GPU readback.
+ * Mirrors the shader's interference sine, evaluated with the LIVE tuning rather than the constants
+ * that used to be frozen here. `field.ts` holds the phase law and the snippets the shader must carry.
  *
- * Returns 0 (full destructive cancellation) → 1 (full constructive).
+ * Returns 0 (full destructive cancellation) -> 1 (full constructive).
  */
+
+import { waveFrontRadius, wavePhase } from './field'
 
 interface Catalyst {
   x: number
@@ -13,12 +15,19 @@ interface Catalyst {
   time: number
 }
 
+/** The fields this mirror needs, taken from the tuning object so both sides read the same numbers. */
+export interface WaveTuning {
+  waveFreq: number
+  waveSpeed: number
+  emDamping: number
+}
+
 export function computeInterferenceRatio(
   catalysts: Catalyst[],
   sampleX: number,
   sampleY: number,
   currentTime: number,
-  waveFreq: number,
+  tuning: WaveTuning,
   waveLifetime: number,
 ): number {
   if (catalysts.length === 0) return 1.0
@@ -34,15 +43,15 @@ export function computeInterferenceRatio(
     const dy = sampleY - cat.y
     const dist = Math.sqrt(dx * dx + dy * dy)
 
-    // Match shader: emDamping and extended field decay
-    const emDamping = Math.exp(-age * 0.5)
-    const waveFront = age * 1.15 // waveSpeed default
+    // Match shader: emDamping, the wavefront, and the decay behind it (quantum.frag:321, :363-365)
+    const emDamping = Math.exp(-age * tuning.emDamping)
+    const waveFront = waveFrontRadius(age, tuning.waveSpeed)
     const behindWavefront = dist < waveFront ? 1.0 : 0.0
     const fieldDecay = Math.exp(-Math.max(waveFront - dist, 0) * 3.0)
     const extendedField = behindWavefront * fieldDecay * emDamping
 
-    // Clean sine — exact match to shader's interference formula
-    const cleanWave = Math.sin(dist * waveFreq - age * 30.0)
+    // Clean sine, the same phase the shader evaluates
+    const cleanWave = Math.sin(wavePhase(dist, age, tuning.waveFreq, tuning.waveSpeed))
     fieldSigned += cleanWave * extendedField
     fieldEnvelope += Math.abs(cleanWave) * extendedField
   }
