@@ -25,11 +25,15 @@ export function useAutoSim(callbacks: AutoSimCallbacks) {
   const [simMouseRadius, setSimMouseRadius] = useState(0.15)
 
   const callbacksRef = useRef(callbacks)
-  // Sync refs during render (not in an effect) to eliminate the post-paint stale window
+  // Sync refs during render (not in an effect) to eliminate the post-paint stale window.
+  // Deliberate. The lint-clean form is a useLayoutEffect, which still runs before the first
+  // animation frame, so the intent survives a rewrite. Tracked in DEPLOY.md, "Known, not fixed".
+  // eslint-disable-next-line react-hooks/refs -- deliberate render-time sync, see the note above
   callbacksRef.current = callbacks
 
   // Refs to avoid tearing down the loop when slider changes
   const simStateRef = useRef({ simMode, simSeparation, simRate, simMouseSpeed, simMouseRadius, simClicksOn, simMouseOn, simActive })
+  // eslint-disable-next-line react-hooks/refs -- deliberate render-time sync, see the note above
   simStateRef.current = { simMode, simSeparation, simRate, simMouseSpeed, simMouseRadius, simClicksOn, simMouseOn, simActive }
   
   // Physics state for gravity mode
