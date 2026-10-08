@@ -4,13 +4,13 @@ The Cloudflare Worker `zpe-vc` serves `zpe.vc` (custom domain) from `./dist`.
 
 | | version id | deployed | notes |
 |---|---|---|---|
-| **live now** | `dd1b3c58-ac71-4eca-b917-f3a153379e57` | 2026-10-08 | added the daily ceiling on token mints |
-| **roll back to** | `c4a30516-d589-401d-acf8-19253393654c` | 2026-10-08 | the previous live build (forge-log route removed) |
+| **live now** | `41a00d92-99c1-4bb1-bd1e-fe36ef01450f` | 2026-10-08 | the calm default: `waveFreq` 30, saved-tuning key v5 |
+| **roll back to** | `dd1b3c58-ac71-4eca-b917-f3a153379e57` | 2026-10-08 | the previous live build (daily mint ceiling) |
 
 Rollback (one command):
 
 ```sh
-cf_run.sh <wrangler> versions deploy c4a30516-d589-401d-acf8-19253393654c \
+cf_run.sh <wrangler> versions deploy dd1b3c58-ac71-4eca-b917-f3a153379e57 \
   --config wrangler.jsonc
 ```
 
@@ -27,7 +27,24 @@ Wrangler is not vendored in this repo, so the deploy resolves it through npx
 
 ## History
 
-- **2026-10-08 (latest)**: added a daily ceiling on token mints. The per-IP limit on its own let
+- **2026-10-08 (latest)**: shipped the calm default for the wave field. The engine change one
+  commit earlier (`753c766`) made one knob set both the crest speed and the shimmer rate
+  (`waveFreq * waveSpeed`). At the old default of 150 that pushed the shimmer from 30 to 150
+  rad/s, five times the rate the page ever moved, which is what the owner saw and pushed back on.
+  He picked the wider-ripple variant out of a four-panel preview, so `DEFAULT_TUNING.waveFreq`
+  went 150 -> 30 and `freq * speed` stays at the 30 rad/s the original shader hardcoded. The
+  active tuning persists in localStorage and saved values beat defaults, so a returning visitor
+  would have kept the old frequency; `ACTIVE_KEY` moved `zpe-shader-active-v4` -> `v5` and
+  everyone gets the new default once. Two tests in `field.test.ts` lock both numbers (suite
+  21 -> 23). Commit `8f45a48`. Deployed `41a00d92`; probes after: `GET /` 200 serving
+  `assets/index-7KPcXS-s.js`, the bundle carries `zpe-shader-active-v5`, and the default object
+  holds `waveFreq:30` with no `v4` key left in the file.
+  **Open, needs the owner's yes**: the 13 built-in presets carry their own frequencies, so their
+  shimmer moved with the same fix. Three of them now run at rates that read as noise
+  (Supermassive `7500 x 100`, Hypernova `375000 x 0.1`, Wobverse `110710 x 16.9`). Holding each
+  preset's authored 30 rad/s means re-deriving its frequency as `30 / speed`, which rewrites his
+  curated content, so it waits.
+- **2026-10-08**: added a daily ceiling on token mints. The per-IP limit on its own let
   one address ask the model roughly 7,200 times a day (10 mints per 10 minutes, 5 uses per
   token). `MAX_MINTS_PER_DAY = 500` caps the whole day at 500 x 5 = 2,500 model calls. It is
   read before the per-IP check, so a refused mint spends nothing else. The counter lives at
