@@ -46,10 +46,6 @@ export default {
       return handleForge(request, env, ctx)
     }
 
-    if (url.pathname === '/api/forge/log' && request.method === 'GET') {
-      return handleForgeLog(request, env)
-    }
-
     // ── Static Assets ──
     const response = await env.ASSETS.fetch(request)
 
@@ -236,38 +232,3 @@ async function saveForgeLog(env: Env, idea: string, stream: ReadableStream): Pro
   }), { expirationTtl: 30 * 24 * 60 * 60 })
 }
 
-async function handleForgeLog(request: Request, env: Env): Promise<Response> {
-  const token = getBearerToken(request)
-  if (!token) {
-    return new Response(JSON.stringify({ error: 'Missing forge token' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
-
-  const { valid } = await verifyToken(token, env.FORGE_SECRET)
-  if (!valid) {
-    return new Response(JSON.stringify({ error: 'Forge token expired or invalid' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
-
-  const { keys } = await env.FORGE_LOG.list({ prefix: 'forge-log:', limit: 50 })
-  const entries = await Promise.all(
-    keys.map(async (k) => {
-      const val = await env.FORGE_LOG.get(k.name)
-      if (!val) {
-        return null
-      }
-      try {
-        return JSON.parse(val)
-      } catch {
-        return null
-      }
-    })
-  )
-  return new Response(JSON.stringify(entries.filter(Boolean)), {
-    headers: { 'Content-Type': 'application/json' },
-  })
-}
