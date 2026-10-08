@@ -64,7 +64,26 @@ export default {
 
 // ── Token Minting ──
 
+// Ceiling on token mints per UTC day. The per-IP limit below is easy to sidestep with many
+// addresses, so bound the day itself. Worst case: MAX_MINTS_PER_DAY * MAX_USES model calls
+// (500 * 5 = 2,500). It is a soft bound: KV has no atomic increment, so a burst can overshoot.
+const MAX_MINTS_PER_DAY = 500
+export { MAX_MINTS_PER_DAY }
+
 async function mintForgeToken(request: Request, env: Env): Promise<Response> {
+  // Daily ceiling first, so a rejected request does not also spend the per-IP allowance.
+  const secondsToUtcMidnight = Math.ceil((86_400_000 - (Date.now() % 86_400_000)) / 1000)
+  const dayKey = `forge-mints:${new Date().toISOString().slice(0, 10)}`
+  const mintsToday = Number(await env.FORGE_LOG.get(dayKey)) || 0
+  if (mintsToday >= MAX_MINTS_PER_DAY) {
+    return new Response(JSON.stringify({ error: 'The forge has hit its daily limit. Try again tomorrow.' }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json', 'Retry-After': String(secondsToUtcMidnight) },
+    })
+  }
+  // Expire just after the day rolls over, so the key cleans itself up (no orphan keys).
+  await env.FORGE_LOG.put(dayKey, String(mintsToday + 1), { expirationTtl: secondsToUtcMidnight + 3600 })
+
   // IP-based rate limit: max 10 tokens per 10 minutes per IP
   const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown'
   const rateLimitKey = `forge-ratelimit:${ip}`
