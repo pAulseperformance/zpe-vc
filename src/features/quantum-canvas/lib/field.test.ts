@@ -134,3 +134,26 @@ describe('the shipped default keeps the calm shimmer', () => {
     expect(DEFAULT_TUNING.waveSpeed).toBeCloseTo(1, 6)
   })
 })
+
+describe('the built-in presets keep their authored shimmer', () => {
+  it('covers every preset, and holds all of them at 30 radians per second', async () => {
+    const { BUILT_IN_PRESETS } = await import('./shader-tuning')
+    expect(Object.keys(BUILT_IN_PRESETS)).toHaveLength(15)
+    const drifted: string[] = []
+    for (const [name, preset] of Object.entries(BUILT_IN_PRESETS)) {
+      const shimmer = preset.waveFreq * preset.waveSpeed
+      if (Math.abs(shimmer - 30) > 0.5) drifted.push(`${name} ${shimmer.toFixed(2)}`)
+    }
+    expect(drifted).toEqual([])
+  })
+
+  it('keeps every preset frequency inside the Wave Freq slider', async () => {
+    const { BUILT_IN_PRESETS, OBJECT_SLIDERS } = await import('./shader-tuning')
+    const slider = OBJECT_SLIDERS.find((def) => def.key === 'waveFreq')
+    expect(slider).toBeDefined()
+    for (const [name, preset] of Object.entries(BUILT_IN_PRESETS)) {
+      expect(preset.waveFreq, name).toBeGreaterThanOrEqual(slider!.min)
+      expect(preset.waveFreq, name).toBeLessThanOrEqual(slider!.max)
+    }
+  })
+})

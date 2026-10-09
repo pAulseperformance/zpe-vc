@@ -150,7 +150,7 @@ export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
     paletteMode: 1,
     wavelength: 2,
     waveSpeed: 0.35,
-    waveFreq: 150,
+    waveFreq: 85.7,
     waveWidth: 0.1,
     emDamping: 3.1,
     gravDamping: 0.05,
@@ -181,7 +181,7 @@ export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
     paletteMode: 0, // Physical
     wavelength: 2,  // Visible
     waveSpeed: 2.00,
-    waveFreq: 25,
+    waveFreq: 15,
     waveWidth: 0.100,
     emDamping: 10.00,
     gravDamping: 2.90,
@@ -212,7 +212,7 @@ export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
     paletteMode: 0, // Physical
     wavelength: 2,  // Visible / HUMAN
     waveSpeed: 0.10, // Slow creeping phase
-    waveFreq: 10,
+    waveFreq: 300,
     waveWidth: 0.005,
     emDamping: 0.10,
     gravDamping: 0.05,
@@ -244,7 +244,7 @@ export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
     paletteMode: 1, // Artistic
     wavelength: 2,  // Visible / HUMAN
     waveSpeed: 0.10,
-    waveFreq: 7500,
+    waveFreq: 300,
     waveWidth: 5,
     emDamping: 6.7,
     gravDamping: 0.05,
@@ -279,7 +279,7 @@ export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
     paletteMode: 1, // Artistic
     wavelength: 2,
     waveSpeed: 0.1,
-    waveFreq: 10,
+    waveFreq: 300,
     waveWidth: 0.08,
     emDamping: 6.7,
     gravDamping: 8.2,
@@ -315,7 +315,7 @@ export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
     paletteMode: 1, // Artistic
     wavelength: 2,
     waveSpeed: 0.1,
-    waveFreq: 10,
+    waveFreq: 300,
     waveWidth: 0.215,
     emDamping: 6.7,
     gravDamping: 8.2,
@@ -351,7 +351,7 @@ export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
     paletteMode: 1, // Artistic
     wavelength: 2,
     waveSpeed: 0.1,
-    waveFreq: 10,
+    waveFreq: 300,
     waveWidth: 0.215,
     emDamping: 6.7,
     gravDamping: 8.2,
@@ -387,7 +387,7 @@ export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
     paletteMode: 0, // Physical
     wavelength: 2,
     waveSpeed: 1.9,
-    waveFreq: 150,
+    waveFreq: 15.8,
     waveWidth: 0.1,
     emDamping: 1.6,
     gravDamping: 1.6,
@@ -422,7 +422,7 @@ export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
     ...DEFAULT_TUNING,
     paletteMode: 2, // Hybrid
     waveSpeed: 0.3,
-    waveFreq: 150,
+    waveFreq: 100,
     starField: 0.8,
     emDamping: 1.2,
     gravDamping: 0.5,
@@ -440,7 +440,7 @@ export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
   'Supermassive': {
     ...DEFAULT_TUNING,
     waveSpeed: 100,
-    waveFreq: 7500,
+    waveFreq: 0.3,
     waveWidth: 5,
     emDamping: 1.6,
     gravDamping: 1.6,
@@ -486,7 +486,7 @@ export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
   'Hypernova': {
     ...DEFAULT_TUNING,
     waveSpeed: 0.1,
-    waveFreq: 375000,
+    waveFreq: 300,
     waveWidth: 0.005,
     emDamping: 0.1,
     gravDamping: 1,
@@ -532,7 +532,7 @@ export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
   'Wobverse': {
     ...DEFAULT_TUNING,
     waveSpeed: 16.9,
-    waveFreq: 110710,
+    waveFreq: 1.8,
     waveWidth: 5,
     emDamping: 10.8,
     gravDamping: 5.95,
@@ -564,7 +564,7 @@ export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
   'God\'s Eye': {
     ...DEFAULT_TUNING,
     waveSpeed: 16.9,
-    waveFreq: 110710,
+    waveFreq: 1.8,
     waveWidth: 5,
     emDamping: 10.8,
     gravDamping: 5.95,
@@ -607,7 +607,7 @@ export const BUILT_IN_PRESETS: Record<string, ShaderTuning> = {
   'Ode': {
     ...DEFAULT_TUNING,
     waveSpeed: 1,
-    waveFreq: 150,
+    waveFreq: 30,
     waveWidth: 0.1,
     emDamping: 1.6,
     gravDamping: 1.6,
@@ -667,7 +667,7 @@ export const MOUSE_SLIDERS: SliderDef[] = [
 
 export const OBJECT_SLIDERS: SliderDef[] = [
   { key: 'waveSpeed', label: 'Wave Speed', min: 0.1, max: 100.0, step: 0.05 },
-  { key: 'waveFreq', label: 'Wave Freq', min: 10, max: 500000, step: 100 },
+  { key: 'waveFreq', label: 'Wave Freq', min: 0.1, max: 1000, step: 0.1 },
   { key: 'waveWidth', label: 'Wave Width', min: 0.005, max: 5.0, step: 0.005 },
   { key: 'emDamping', label: 'EM Damping', min: 0.1, max: 20, step: 0.1 },
   { key: 'gravDamping', label: 'Grav Damping', min: 0.05, max: 20, step: 0.05 },
