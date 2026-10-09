@@ -4,13 +4,13 @@ The Cloudflare Worker `zpe-vc` serves `zpe.vc` (custom domain) from `./dist`.
 
 | | version id | deployed | notes |
 |---|---|---|---|
-| **live now** | `41a00d92-99c1-4bb1-bd1e-fe36ef01450f` | 2026-10-08 | the calm default: `waveFreq` 30, saved-tuning key v5 |
-| **roll back to** | `dd1b3c58-ac71-4eca-b917-f3a153379e57` | 2026-10-08 | the previous live build (daily mint ceiling) |
+| **live now** | `af4839b7-8b70-438c-bb9c-32bfc2bd44f6` | 2026-10-08 | every preset re-derived to hold 30 rad/s, Wave Freq slider widened |
+| **roll back to** | `41a00d92-99c1-4bb1-bd1e-fe36ef01450f` | 2026-10-08 | the calm default (`waveFreq` 30, saved-tuning key v5) |
 
 Rollback (one command):
 
 ```sh
-cf_run.sh <wrangler> versions deploy dd1b3c58-ac71-4eca-b917-f3a153379e57 \
+cf_run.sh <wrangler> versions deploy 41a00d92-99c1-4bb1-bd1e-fe36ef01450f \
   --config wrangler.jsonc
 ```
 
@@ -27,7 +27,22 @@ Wrangler is not vendored in this repo, so the deploy resolves it through npx
 
 ## History
 
-- **2026-10-08 (latest)**: shipped the calm default for the wave field. The engine change one
+- **2026-10-08 (latest)**: held every built-in preset at the 30 rad/s shimmer each was authored
+  against, on the owner's yes. The presets were written when the shader hardcoded that rate, and
+  their frequencies were picked for ripple density alone, so the engine fix moved all of them.
+  Each now carries `frequency = 30 / speed` rounded to 0.1: Pulsar/Singularity/Prism Star/Twin
+  Prism `10 -> 300`, Starburst `7500 -> 300`, Hypernova `375000 -> 300`, Stable Nova `150 -> 85.7`,
+  Orbit `150 -> 15.8`, Purple Nebula `25 -> 15`, Galaxy Cluster `150 -> 100`, Ode `150 -> 30`,
+  Wobverse and God's Eye `110710 -> 1.8`, Supermassive `7500 -> 0.3`. The Wave Freq slider could
+  not hold those values (min 10, step 100), so it moves to 0.1 to 1000 step 0.1, which also brings
+  the hand-synth mapping (writes 1 to 51) inside the range it always should have been. Ripple
+  density follows the new frequencies on purpose: slow presets gain fine rings, violent ones lose
+  the sub-pixel moiré. Two tests cover it, all 15 presets hold 30 rad/s within 0.5 and every
+  frequency sits inside the slider (suite 23 -> 25). Commit `680fd43`. Deployed `af4839b7`; probes
+  after: `GET /` 200 serving `assets/index-CMf62N6h.js`, which carries the new frequencies (0.3,
+  1.8, 15, 15.8, 30, 85.7, 100, 300) and the `v5` key; the lazy `QuantumCanvas-DLmKGlni.js` chunk
+  is byte-identical to the previous deploy, since only tuning values changed.
+- **2026-10-08**: shipped the calm default for the wave field. The engine change one
   commit earlier (`753c766`) made one knob set both the crest speed and the shimmer rate
   (`waveFreq * waveSpeed`). At the old default of 150 that pushed the shimmer from 30 to 150
   rad/s, five times the rate the page ever moved, which is what the owner saw and pushed back on.
@@ -39,11 +54,9 @@ Wrangler is not vendored in this repo, so the deploy resolves it through npx
   21 -> 23). Commit `8f45a48`. Deployed `41a00d92`; probes after: `GET /` 200 serving
   `assets/index-7KPcXS-s.js`, the bundle carries `zpe-shader-active-v5`, and the default object
   holds `waveFreq:30` with no `v4` key left in the file.
-  **Open, needs the owner's yes**: the 13 built-in presets carry their own frequencies, so their
-  shimmer moved with the same fix. Three of them now run at rates that read as noise
-  (Supermassive `7500 x 100`, Hypernova `375000 x 0.1`, Wobverse `110710 x 16.9`). Holding each
-  preset's authored 30 rad/s means re-deriving its frequency as `30 / speed`, which rewrites his
-  curated content, so it waits.
+  **Followed the same day**: the 15 built-in presets carry their own frequencies, so the same fix
+  moved their shimmer too (Ode five times faster, and Starburst, Hypernova, Wobverse and God's Eye
+  at rates that read as noise). The owner approved re-deriving each one, which is the entry above.
 - **2026-10-08**: added a daily ceiling on token mints. The per-IP limit on its own let
   one address ask the model roughly 7,200 times a day (10 mints per 10 minutes, 5 uses per
   token). `MAX_MINTS_PER_DAY = 500` caps the whole day at 500 x 5 = 2,500 model calls. It is
