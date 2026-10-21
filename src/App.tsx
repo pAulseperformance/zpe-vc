@@ -304,6 +304,17 @@ export default function App() {
         </Suspense>
       )}
 
+      {/* The one quiet link on the page, and the only thing here that asks nothing of you. It
+          points at zpe.vc/privacy, which shows a visitor exactly what a server can read from their
+          request. Deliberately small and low contrast: this is a showcase, not a directory. */}
+      <a
+        href="/privacy"
+        className="absolute bottom-4 right-5 z-40 font-primary text-[11px] uppercase tracking-[0.18em] text-cold-white-dim opacity-60 underline-offset-4 transition-opacity duration-200 hover:opacity-100 hover:underline focus-visible:opacity-100"
+        style={{ cursor: 'pointer' }}
+      >
+        What this site can see
+      </a>
+
       {performanceMode && (
         <button
           onClick={() => setPerformanceMode(false)}
